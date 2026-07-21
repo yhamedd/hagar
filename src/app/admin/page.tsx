@@ -790,8 +790,8 @@ export default function AdminPage() {
               <div><label className={labelCls}>Phone</label><input type="tel" value={mPhone} onChange={(e) => setMPhone(e.target.value)} className={inputCls} /></div>
 
               <div className="grid grid-cols-2 gap-3">
-                <div><label className={labelCls}>Date</label><input type="date" value={mDate} onChange={(e) => setMDate(e.target.value)} className={inputCls} /></div>
-                <div>
+                <div className="min-w-0"><label className={labelCls}>Date</label><input type="date" value={mDate} onChange={(e) => setMDate(e.target.value)} className={`${inputCls} min-w-0`} /></div>
+                <div className="min-w-0">
                   <label className={labelCls}>Time</label>
                   <select value={mTime} onChange={(e) => setMTime(e.target.value)} className={inputCls}>
                     <option value="">Select…</option>
