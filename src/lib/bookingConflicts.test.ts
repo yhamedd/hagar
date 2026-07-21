@@ -12,9 +12,11 @@ describe("duration-aware booking conflicts", () => {
     expect(hasBookingConflict([{ bookingTime: "13:00:00", duration: 90 }], "14:30", 60)).toBe(false);
   });
 
-  it("prevents services from extending past closing", () => {
+  it("allows a service to start at closing time regardless of duration", () => {
     const tech = { slotType: "range", availableDays: [1], startTime: "13:00", endTime: "19:00", slotInterval: 60, fixedSlots: null };
-    expect(appointmentFitsSchedule(tech, "17:00", 120)).toBe(true);
-    expect(appointmentFitsSchedule(tech, "18:00", 120)).toBe(false);
+    expect(appointmentFitsSchedule(tech, "17:00")).toBe(true);
+    expect(appointmentFitsSchedule(tech, "19:00")).toBe(true);
+    expect(appointmentFitsSchedule(tech, "19:30")).toBe(false);
+    expect(appointmentFitsSchedule(tech, "12:30")).toBe(false);
   });
 });

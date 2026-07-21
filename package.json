@@ -12,6 +12,7 @@
     "db:migrate": "drizzle-kit migrate",
     "db:seed": "tsx src/db/seed.ts",
     "db:set-credentials": "tsx scripts/set-credentials.ts",
+    "db:block-until": "tsx scripts/block-until.ts",
     "db:migrate:dev": "dotenv -e .env.development.local -- drizzle-kit migrate",
     "db:seed:dev": "dotenv -e .env.development.local -- tsx src/db/seed.ts",
     "replit:setup": "npm run db:migrate && npm run db:seed",

@@ -22,9 +22,12 @@ export function hasBookingConflict(existing: OccupiedBooking[], start: string, d
   ));
 }
 
-export function appointmentFitsSchedule(tech: TechnicianAvailability, start: string, duration: number): boolean {
+// A service is allowed to run past closing time once it has started (e.g. a
+// technician working 13:00-19:00 can still start a 2-hour service at 19:00,
+// the last appointment slot); only the start time needs to fall within hours.
+export function appointmentFitsSchedule(tech: TechnicianAvailability, start: string): boolean {
   if (tech.slotType === "fixed") return Boolean(tech.fixedSlots?.includes(start.slice(0, 5)));
   if (!tech.startTime || !tech.endTime) return false;
   const startMinutes = timeToMinutes(start);
-  return startMinutes >= timeToMinutes(tech.startTime) && startMinutes + duration <= timeToMinutes(tech.endTime);
+  return startMinutes >= timeToMinutes(tech.startTime) && startMinutes <= timeToMinutes(tech.endTime);
 }

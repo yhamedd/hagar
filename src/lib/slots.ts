@@ -21,11 +21,11 @@ export function generateTimeSlots(tech: TechnicianAvailability): string[] {
     const end = parse(tech.endTime, "HH:mm:ss", baseDate);
     let current = start;
 
+    // The closing time itself is a valid last appointment (e.g. hours 13:00-19:00
+    // means 19:00 is the last bookable start, not 18:00).
     while (isBefore(current, end) || isEqual(current, end)) {
       slots.push(format(current, "HH:mm"));
       current = addMinutes(current, tech.slotInterval);
-      // Don't add the end time itself as a slot if it's the closing time
-      if (isEqual(current, end) || isBefore(end, current)) break;
     }
 
     return slots;

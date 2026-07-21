@@ -84,7 +84,7 @@ export async function GET(request: Request) {
     );
     const slotsRemaining = allSlots.filter(
       (slot) =>
-        appointmentFitsSchedule(tech, slot, duration) &&
+        appointmentFitsSchedule(tech, slot) &&
         !hasBookingConflict(dayBookings, slot, duration) &&
         (dateStr !== now.date || slot > now.time)
     ).length;

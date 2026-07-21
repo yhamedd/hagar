@@ -80,7 +80,7 @@ export async function GET(request: Request) {
   const slots = allSlots.map((slot) => ({
     time: slot,
     available:
-      appointmentFitsSchedule(tech, slot, duration) &&
+      appointmentFitsSchedule(tech, slot) &&
       !hasBookingConflict(occupied, slot, duration) &&
       (dateStr !== now.date || slot > now.time),
   }));

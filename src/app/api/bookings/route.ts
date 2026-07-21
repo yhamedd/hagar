@@ -107,7 +107,7 @@ export async function POST(request: Request) {
       if (
         !isDayAvailable(technician, day) ||
         !generateTimeSlots(technician).includes(normalizedTime) ||
-        !appointmentFitsSchedule(technician, normalizedTime, duration)
+        !appointmentFitsSchedule(technician, normalizedTime)
       ) {
         throw new BookingError("This time is outside the technician's working schedule", 400);
       }

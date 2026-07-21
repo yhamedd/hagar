@@ -68,7 +68,7 @@ export async function PUT(request: Request) {
         const tech = techRows[0];
         const weekday = new Date(`${nextDate}T00:00:00Z`).getUTCDay();
         const nextDuration = current.duration || 60;
-        if (!tech || !isDayAvailable(tech, weekday) || !generateTimeSlots(tech).includes(nextTime) || !appointmentFitsSchedule(tech, nextTime, nextDuration)) {
+        if (!tech || !isDayAvailable(tech, weekday) || !generateTimeSlots(tech).includes(nextTime) || !appointmentFitsSchedule(tech, nextTime)) {
           throw new AdminBookingError("Time is outside the technician's schedule", 400);
         }
         const blocked = await tx.select({ id: blockedDates.id }).from(blockedDates).where(and(
@@ -122,7 +122,7 @@ export async function POST(request: Request) {
       }
       const duration = selectedService.duration + selectedExtras.reduce((sum, item) => sum + item.duration, 0);
       const day = new Date(`${bookingDate}T00:00:00Z`).getUTCDay();
-      if (!isDayAvailable(tech, day) || !generateTimeSlots(tech).includes(bookingTime) || !appointmentFitsSchedule(tech, bookingTime, duration)) throw new AdminBookingError("Time is outside the technician's schedule", 400);
+      if (!isDayAvailable(tech, day) || !generateTimeSlots(tech).includes(bookingTime) || !appointmentFitsSchedule(tech, bookingTime)) throw new AdminBookingError("Time is outside the technician's schedule", 400);
       const unavailable = await tx.select({ id: blockedDates.id }).from(blockedDates).where(and(eq(blockedDates.technicianId, technicianId), eq(blockedDates.blockedDate, bookingDate))).limit(1);
       if (unavailable.length) throw new AdminBookingError("Technician is blocked on this date", 409);
       const collision = await tx.select({ bookingTime: bookings.bookingTime, duration: bookings.duration }).from(bookings).where(and(eq(bookings.technicianId, technicianId), eq(bookings.bookingDate, bookingDate), sql`${bookings.status} in ('confirmed', 'pending_deposit')`));

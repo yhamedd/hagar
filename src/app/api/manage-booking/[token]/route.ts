@@ -68,7 +68,7 @@ export async function PUT(request: Request, context: Context) {
       await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`${row.booking.technicianId}:${bookingDate}`}))`);
       const day = new Date(`${bookingDate}T00:00:00Z`).getUTCDay();
       const duration = row.booking.duration || 60;
-      if (!isDayAvailable(row.technician, day) || !generateTimeSlots(row.technician).includes(bookingTime) || !appointmentFitsSchedule(row.technician, bookingTime, duration)) throw new ManageError("Time is outside the technician's schedule", 400);
+      if (!isDayAvailable(row.technician, day) || !generateTimeSlots(row.technician).includes(bookingTime) || !appointmentFitsSchedule(row.technician, bookingTime)) throw new ManageError("Time is outside the technician's schedule", 400);
       const blocked = await tx.select({ id: blockedDates.id }).from(blockedDates).where(and(eq(blockedDates.technicianId, row.booking.technicianId), eq(blockedDates.blockedDate, bookingDate))).limit(1);
       if (blocked.length) throw new ManageError("Technician is unavailable on this date", 409);
       const occupied = await tx.select({ bookingTime: bookings.bookingTime, duration: bookings.duration }).from(bookings).where(and(eq(bookings.technicianId, row.booking.technicianId), eq(bookings.bookingDate, bookingDate), ne(bookings.id, row.booking.id), sql`${bookings.status} in ('confirmed', 'pending_deposit')`));
