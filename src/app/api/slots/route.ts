@@ -7,7 +7,7 @@ import { getDay } from "date-fns";
 import { cleanupStaleBookings } from "@/lib/cleanupBookings";
 import { parseId, isValidDate } from "@/lib/validate";
 import { appointmentFitsSchedule, hasBookingConflict } from "@/lib/bookingConflicts";
-import { findActiveTechnician } from "@/lib/availability";
+import { findActiveTechnician, requestedDuration } from "@/lib/availability";
 import { cairoNowParts } from "@/lib/cairoTime";
 
 export async function GET(request: Request) {
@@ -15,6 +15,7 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const techId = parseId(searchParams.get("technicianId"));
   const dateStr = searchParams.get("date");
+  const duration = requestedDuration(searchParams);
 
   if (!techId) {
     return NextResponse.json({ error: "Valid technicianId is required" }, { status: 400 });
@@ -60,7 +61,7 @@ export async function GET(request: Request) {
 
   // Get existing bookings for this technician on this date (both confirmed + pending)
   const existingBookings = await db
-    .select({ bookingTime: bookings.bookingTime, status: bookings.status })
+    .select({ bookingTime: bookings.bookingTime, duration: bookings.duration, status: bookings.status })
     .from(bookings)
     .where(
       and(
@@ -80,7 +81,7 @@ export async function GET(request: Request) {
     time: slot,
     available:
       appointmentFitsSchedule(tech, slot) &&
-      !hasBookingConflict(occupied, slot, tech.slotInterval || 60) &&
+      !hasBookingConflict(occupied, slot, duration) &&
       (dateStr !== now.date || slot > now.time),
   }));
 

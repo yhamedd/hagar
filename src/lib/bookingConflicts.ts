@@ -1,6 +1,6 @@
 import type { TechnicianAvailability } from "@/lib/slots";
 
-type OccupiedBooking = { bookingTime: string };
+type OccupiedBooking = { bookingTime: string; duration: number | null };
 
 function timeToMinutes(time: string): number {
   const [hours, minutes] = time.slice(0, 5).split(":").map(Number);
@@ -13,12 +13,14 @@ export function rangesOverlap(startA: string, durationA: number, startB: string,
   return a < b + durationB && b < a + durationA;
 }
 
-// Every appointment occupies exactly one technician slot regardless of the
-// selected service's actual duration, so scheduling conflicts are checked
-// against a constant width (the technician's slot interval), not the
-// service's real duration.
-export function hasBookingConflict(existing: OccupiedBooking[], start: string, slotDuration: number): boolean {
-  return existing.some((booking) => rangesOverlap(booking.bookingTime, slotDuration, start, slotDuration));
+// Conflicts must be checked against each booking's real duration, not a
+// constant slot width: a technician whose services (e.g. a 120-minute
+// service on an hourly schedule) run longer than her slot interval would
+// otherwise let two clients get booked into overlapping time, since a
+// constant width doesn't reserve the technician for as long as the
+// appointment actually takes.
+export function hasBookingConflict(existing: OccupiedBooking[], start: string, duration: number): boolean {
+  return existing.some((booking) => rangesOverlap(booking.bookingTime, booking.duration || 60, start, duration));
 }
 
 // A service is allowed to run past closing time once it has started (e.g. a

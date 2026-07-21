@@ -117,7 +117,7 @@ export async function POST(request: Request) {
       if (blocked.length) throw new BookingError("The technician is unavailable on this date", 409);
 
       const existing = await tx
-        .select({ bookingTime: bookings.bookingTime })
+        .select({ bookingTime: bookings.bookingTime, duration: bookings.duration })
         .from(bookings)
         .where(
           and(
@@ -126,7 +126,7 @@ export async function POST(request: Request) {
             sql`${bookings.status} in ('confirmed', 'pending_deposit')`
           )
         )
-      if (hasBookingConflict(existing, normalizedTime, technician.slotInterval || 60)) {
+      if (hasBookingConflict(existing, normalizedTime, duration)) {
         throw new BookingError("This time overlaps another appointment", 409);
       }
 
