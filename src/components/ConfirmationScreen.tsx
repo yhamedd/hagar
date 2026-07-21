@@ -265,9 +265,6 @@ export default function ConfirmationScreen({
           </div>
 
           {/* New booking button */}
-          {typeof bookingResult?.managementToken === "string" && (
-            <a href={`/manage/${bookingResult.managementToken}`} className="mb-3 flex w-full h-12 items-center justify-center border border-black text-sm font-medium hover:bg-black hover:text-white transition-colors">Manage or Reschedule Booking</a>
-          )}
           <button
             onClick={onNewBooking}
             className="w-full h-12 border border-gray-200 text-sm font-medium hover:border-black hover:bg-black hover:text-white active:bg-gray-900 transition-colors duration-150"

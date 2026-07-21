@@ -47,9 +47,14 @@ export default function StepHeader({
           ) : (
             <div />
           )}
-          <div className="relative w-28 h-9 overflow-hidden" aria-label="Hagar Lashes">
-            <Image src="/hagar-lashes-logo.jpg" alt="Hagar Lashes" fill sizes="112px" className="object-cover object-center" priority />
-          </div>
+          <Image
+            src="/hagar-lashes-logo.png"
+            alt="Hagar Lashes"
+            width={830}
+            height={238}
+            priority
+            className="h-10 sm:h-11 w-auto"
+          />
           <span className="text-xs text-gray-400 uppercase tracking-wider">{step}/{totalSteps}</span>
         </div>
 

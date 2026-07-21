@@ -13,7 +13,6 @@ import {
 } from "@/lib/validate";
 import { checkRateLimit } from "@/lib/rateLimit";
 import { appointmentFitsSchedule, hasBookingConflict } from "@/lib/bookingConflicts";
-import { createHash, randomBytes } from "node:crypto";
 import { isUniqueViolation } from "@/lib/dbErrors";
 import { cairoNowParts } from "@/lib/cairoTime";
 
@@ -73,8 +72,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "This time has already passed" }, { status: 400 });
     }
 
-    const managementToken = randomBytes(24).toString("base64url");
-    const managementTokenHash = createHash("sha256").update(managementToken).digest("hex");
     const result = await db.transaction(async (tx) => {
       // All starts for a technician/date share a lock so two requests can't
       // both pass the conflict check for the same slot at once.
@@ -166,7 +163,6 @@ export async function POST(request: Request) {
           status: "pending_deposit",
           policyAcknowledged,
           notes,
-          managementTokenHash,
         })
         .returning();
 
@@ -179,7 +175,6 @@ export async function POST(request: Request) {
       price: result.booking.price,
       duration: result.booking.duration,
       priceIsEstimate: result.booking.priceIsEstimate,
-      managementToken,
       status: result.booking.status,
       expiresAt: new Date(result.booking.createdAt.getTime() + 60 * 60 * 1000).toISOString(),
       message: "Booking created successfully!",
