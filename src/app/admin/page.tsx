@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { formatTime12h } from "@/lib/timeFormat";
+import { generateTimeSlots } from "@/lib/slots";
 import type { ServiceCatalogItem } from "@/lib/serviceCatalog";
 
 // ────────────────────────────────────────────────────────
@@ -263,6 +264,11 @@ export default function AdminPage() {
   const tName = useCallback((id: number) => allT.find((t) => t.id === id)?.name ?? "—", [allT]);
   const mTechs = useMemo(() => mCat ? allT.filter((t) => t.category === mCat) : [], [allT, mCat]);
   const mSvcs = useMemo(() => mCat ? serviceCatalog.filter((service) => service.category === mCat) : [], [mCat, serviceCatalog]);
+  // Only offer times the selected technician actually works, instead of every hour of the day.
+  const mTimeOpts = useMemo(() => {
+    const tech = allT.find((t) => t.id === mTech);
+    return tech ? generateTimeSlots(tech).map((v) => ({ v, l: formatTime12h(v) })) : [];
+  }, [allT, mTech]);
 
   // ── Fetch helper ──
   const af = useCallback((url: string, opts?: RequestInit) =>
@@ -772,7 +778,7 @@ export default function AdminPage() {
 
               <div>
                 <label className={labelCls}>Technician</label>
-                <select value={mTech} onChange={(e) => setMTech(+e.target.value)} disabled={!mCat} className={`${inputCls} disabled:bg-gray-50 disabled:text-gray-400`}>
+                <select value={mTech} onChange={(e) => { setMTech(+e.target.value); setMTime(""); }} disabled={!mCat} className={`${inputCls} disabled:bg-gray-50 disabled:text-gray-400`}>
                   <option value={0}>{mCat ? "Select technician…" : "Pick category first"}</option>
                   {mTechs.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
                 </select>
@@ -789,15 +795,13 @@ export default function AdminPage() {
               <div><label className={labelCls}>Client Name</label><input type="text" value={mName} onChange={(e) => setMName(e.target.value)} className={inputCls} /></div>
               <div><label className={labelCls}>Phone</label><input type="tel" value={mPhone} onChange={(e) => setMPhone(e.target.value)} className={inputCls} /></div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div className="min-w-0"><label className={labelCls}>Date</label><input type="date" value={mDate} onChange={(e) => setMDate(e.target.value)} className={`${inputCls} min-w-0`} /></div>
-                <div className="min-w-0">
-                  <label className={labelCls}>Time</label>
-                  <select value={mTime} onChange={(e) => setMTime(e.target.value)} className={inputCls}>
-                    <option value="">Select…</option>
-                    {TIME_OPTS.map((o) => <option key={o.v} value={o.v}>{o.l}</option>)}
-                  </select>
-                </div>
+              <div><label className={labelCls}>Date</label><input type="date" value={mDate} onChange={(e) => setMDate(e.target.value)} className={inputCls} /></div>
+              <div>
+                <label className={labelCls}>Time</label>
+                <select value={mTime} onChange={(e) => setMTime(e.target.value)} disabled={!mTech} className={`${inputCls} disabled:bg-gray-50 disabled:text-gray-400`}>
+                  <option value="">{mTech ? "Select…" : "Pick technician first"}</option>
+                  {mTimeOpts.map((o) => <option key={o.v} value={o.v}>{o.l}</option>)}
+                </select>
               </div>
 
               <div><label className={labelCls}>Notes</label><textarea value={mNotes} onChange={(e) => setMNotes(e.target.value)} rows={2} className="w-full border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:border-black resize-none" /></div>
