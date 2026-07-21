@@ -1,3 +1,3 @@
 {
-  "buildCommand": "npm run db:migrate && npm run db:block-until && npm run build"
+  "buildCommand": "npm run db:migrate && npm run build"
 }
