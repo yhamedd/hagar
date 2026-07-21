@@ -13,7 +13,7 @@ import { generateTimeSlots, isDayAvailable } from "@/lib/slots";
 import { cleanupStaleBookings } from "@/lib/cleanupBookings";
 import { parseId } from "@/lib/validate";
 import { appointmentFitsSchedule, hasBookingConflict } from "@/lib/bookingConflicts";
-import { findActiveTechnician, requestedDuration } from "@/lib/availability";
+import { findActiveTechnician } from "@/lib/availability";
 import { cairoNowParts } from "@/lib/cairoTime";
 
 export async function GET(request: Request) {
@@ -21,7 +21,6 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const techId = parseId(searchParams.get("technicianId"));
   const monthStr = searchParams.get("month"); // e.g. '2026-07'
-  const duration = requestedDuration(searchParams);
 
   if (!techId) {
     return NextResponse.json({ error: "Valid technicianId is required" }, { status: 400 });
@@ -85,7 +84,7 @@ export async function GET(request: Request) {
     const slotsRemaining = allSlots.filter(
       (slot) =>
         appointmentFitsSchedule(tech, slot) &&
-        !hasBookingConflict(dayBookings, slot, duration) &&
+        !hasBookingConflict(dayBookings, slot, tech.slotInterval || 60) &&
         (dateStr !== now.date || slot > now.time)
     ).length;
 

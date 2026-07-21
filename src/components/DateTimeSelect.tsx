@@ -44,7 +44,13 @@ export default function DateTimeSelect({
   onSelect,
   onBack,
 }: Props) {
-  const [currentMonth, setCurrentMonth] = useState(new Date());
+  // Booking reopens in August; default straight to it instead of the (fully
+  // blocked) current month. Once August actually arrives this naturally
+  // falls back to just showing the current month like normal.
+  const [currentMonth, setCurrentMonth] = useState(() => {
+    const now = new Date();
+    return now.getMonth() < 7 ? new Date(now.getFullYear(), 7, 1) : now;
+  });
   const [availableDays, setAvailableDays] = useState<DayInfo[]>([]);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [slots, setSlots] = useState<SlotInfo[]>([]);

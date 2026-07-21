@@ -7,9 +7,9 @@ describe("duration-aware booking conflicts", () => {
     expect(rangesOverlap("13:00", 60, "14:00", 60)).toBe(false);
   });
 
-  it("uses saved booking duration snapshots", () => {
-    expect(hasBookingConflict([{ bookingTime: "13:00:00", duration: 120 }], "14:30", 60)).toBe(true);
-    expect(hasBookingConflict([{ bookingTime: "13:00:00", duration: 90 }], "14:30", 60)).toBe(false);
+  it("checks conflicts against a constant slot width, ignoring the service's real duration", () => {
+    expect(hasBookingConflict([{ bookingTime: "13:00:00" }], "13:30", 60)).toBe(true);
+    expect(hasBookingConflict([{ bookingTime: "13:00:00" }], "14:00", 60)).toBe(false);
   });
 
   it("allows a service to start at closing time regardless of duration", () => {

@@ -67,7 +67,6 @@ export async function PUT(request: Request) {
         const techRows = await tx.select().from(technicians).where(eq(technicians.id, current.technicianId)).limit(1);
         const tech = techRows[0];
         const weekday = new Date(`${nextDate}T00:00:00Z`).getUTCDay();
-        const nextDuration = current.duration || 60;
         if (!tech || !isDayAvailable(tech, weekday) || !generateTimeSlots(tech).includes(nextTime) || !appointmentFitsSchedule(tech, nextTime)) {
           throw new AdminBookingError("Time is outside the technician's schedule", 400);
         }
@@ -75,11 +74,11 @@ export async function PUT(request: Request) {
           eq(blockedDates.technicianId, current.technicianId), eq(blockedDates.blockedDate, nextDate)
         )).limit(1);
         if (blocked.length) throw new AdminBookingError("Technician is blocked on this date", 409);
-        const collision = await tx.select({ bookingTime: bookings.bookingTime, duration: bookings.duration }).from(bookings).where(and(
+        const collision = await tx.select({ bookingTime: bookings.bookingTime }).from(bookings).where(and(
           eq(bookings.technicianId, current.technicianId), eq(bookings.bookingDate, nextDate),
           ne(bookings.id, id), sql`${bookings.status} in ('confirmed', 'pending_deposit')`
         ));
-        if (hasBookingConflict(collision, nextTime, nextDuration)) throw new AdminBookingError("This time overlaps another appointment", 409);
+        if (hasBookingConflict(collision, nextTime, tech.slotInterval || 60)) throw new AdminBookingError("This time overlaps another appointment", 409);
       }
       await tx.update(bookings).set(safeUpdates).where(eq(bookings.id, id));
     });
@@ -125,8 +124,8 @@ export async function POST(request: Request) {
       if (!isDayAvailable(tech, day) || !generateTimeSlots(tech).includes(bookingTime) || !appointmentFitsSchedule(tech, bookingTime)) throw new AdminBookingError("Time is outside the technician's schedule", 400);
       const unavailable = await tx.select({ id: blockedDates.id }).from(blockedDates).where(and(eq(blockedDates.technicianId, technicianId), eq(blockedDates.blockedDate, bookingDate))).limit(1);
       if (unavailable.length) throw new AdminBookingError("Technician is blocked on this date", 409);
-      const collision = await tx.select({ bookingTime: bookings.bookingTime, duration: bookings.duration }).from(bookings).where(and(eq(bookings.technicianId, technicianId), eq(bookings.bookingDate, bookingDate), sql`${bookings.status} in ('confirmed', 'pending_deposit')`));
-      if (hasBookingConflict(collision, bookingTime, duration)) throw new AdminBookingError("This time overlaps another appointment", 409);
+      const collision = await tx.select({ bookingTime: bookings.bookingTime }).from(bookings).where(and(eq(bookings.technicianId, technicianId), eq(bookings.bookingDate, bookingDate), sql`${bookings.status} in ('confirmed', 'pending_deposit')`));
+      if (hasBookingConflict(collision, bookingTime, tech.slotInterval || 60)) throw new AdminBookingError("This time overlaps another appointment", 409);
 
       const clientRows = await tx.insert(clients).values({ name: clientName, phone: clientPhone, phoneNormalized: normalizePhone(clientPhone) }).onConflictDoUpdate({
         target: clients.phoneNormalized, set: { name: clientName, phone: clientPhone, updatedAt: new Date() },

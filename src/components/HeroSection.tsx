@@ -16,9 +16,14 @@ export default function HeroSection({ onBook }: { onBook: () => void }) {
       {/* Navigation */}
       <nav className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-sm border-b border-gray-100">
         <div className="max-w-6xl mx-auto px-5 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <div className="relative w-36 sm:w-40 h-11" aria-label="Hagar Lashes">
-            <Image src="/hagar-lashes-logo.png" alt="Hagar Lashes" fill sizes="160px" className="object-contain object-left" priority />
-          </div>
+          <Image
+            src="/hagar-lashes-logo.png"
+            alt="Hagar Lashes"
+            width={830}
+            height={238}
+            priority
+            className="h-12 sm:h-14 w-auto"
+          />
           <div className="flex items-center gap-2 sm:gap-3">
             <a
               href="https://maps.app.goo.gl/EzPcSawmXD3QJhJ2A?g_st=ic"

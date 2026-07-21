@@ -76,8 +76,8 @@ export async function POST(request: Request) {
     const managementToken = randomBytes(24).toString("base64url");
     const managementTokenHash = createHash("sha256").update(managementToken).digest("hex");
     const result = await db.transaction(async (tx) => {
-      // All starts for a technician/date share a lock because different start
-      // times may still overlap once service duration is considered.
+      // All starts for a technician/date share a lock so two requests can't
+      // both pass the conflict check for the same slot at once.
       const lockKey = `${technicianId}:${bookingDate}`;
       await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${lockKey}))`);
 
@@ -120,7 +120,7 @@ export async function POST(request: Request) {
       if (blocked.length) throw new BookingError("The technician is unavailable on this date", 409);
 
       const existing = await tx
-        .select({ bookingTime: bookings.bookingTime, duration: bookings.duration })
+        .select({ bookingTime: bookings.bookingTime })
         .from(bookings)
         .where(
           and(
@@ -129,7 +129,7 @@ export async function POST(request: Request) {
             sql`${bookings.status} in ('confirmed', 'pending_deposit')`
           )
         )
-      if (hasBookingConflict(existing, normalizedTime, duration)) {
+      if (hasBookingConflict(existing, normalizedTime, technician.slotInterval || 60)) {
         throw new BookingError("This time overlaps another appointment", 409);
       }
 
