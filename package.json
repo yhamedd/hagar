@@ -1,0 +1,49 @@
+{
+  "name": "hagar-booking",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:seed": "tsx src/db/seed.ts",
+    "db:migrate:dev": "dotenv -e .env.development.local -- drizzle-kit migrate",
+    "db:seed:dev": "dotenv -e .env.development.local -- tsx src/db/seed.ts",
+    "replit:setup": "npm run db:migrate && npm run db:seed",
+    "db:persistence:prepare": "dotenv -e .env.development.local -- tsx scripts/persistence-check.ts prepare",
+    "db:persistence:verify": "dotenv -e .env.development.local -- tsx scripts/persistence-check.ts verify",
+    "check": "npm run typecheck && npm run lint && npm run test && npm run build"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "date-fns": "^4.4.0",
+    "drizzle-orm": "0.45.2",
+    "framer-motion": "^12.42.2",
+    "jose": "^6.2.3",
+    "next": "16.2.6",
+    "pg": "8.20.0",
+    "react": "19.2.6",
+    "react-dom": "19.2.6"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "4.1.17",
+    "@types/node": "22.19.15",
+    "@types/pg": "8.18.0",
+    "@types/react": "19.2.14",
+    "@types/react-dom": "19.2.3",
+    "dotenv-cli": "^11.0.0",
+    "drizzle-kit": "0.31.10",
+    "eslint": "9.39.4",
+    "eslint-config-next": "16.2.6",
+    "pg-mem": "^3.0.14",
+    "postcss": "8.5.8",
+    "tailwindcss": "4.1.17",
+    "tsx": "^4.20.6",
+    "typescript": "5.9.3",
+    "vitest": "^3.2.4"
+  }
+}
