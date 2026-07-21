@@ -29,13 +29,14 @@ export default function HeroSection({ onBook }: { onBook: () => void }) {
               href="https://maps.app.goo.gl/EzPcSawmXD3QJhJ2A?g_st=ic"
               target="_blank"
               rel="noopener noreferrer"
-              className="hidden sm:inline-flex h-10 px-4 items-center gap-1.5 border border-gray-200 text-sm font-medium text-gray-600 hover:border-gray-400 hover:text-black transition-colors duration-150"
+              aria-label="Location"
+              className="inline-flex h-10 w-10 sm:w-auto justify-center sm:justify-start px-0 sm:px-4 items-center gap-1.5 border border-gray-200 text-sm font-medium text-gray-600 hover:border-gray-400 hover:text-black transition-colors duration-150"
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a2 2 0 01-2.828 0l-4.243-4.243a8 8 0 1111.314 0z" />
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
               </svg>
-              Location
+              <span className="hidden sm:inline">Location</span>
             </a>
             <button
               onClick={onBook}
