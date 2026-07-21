@@ -132,8 +132,9 @@ export default function DateTimeSelect({
         <div className="grid lg:grid-cols-2 gap-8 lg:gap-10">
           {/* Calendar */}
           <div>
-            {/* Month navigation */}
-            <div className="flex items-center justify-between mb-4">
+            {/* Month navigation: kept reachable via sticky positioning so switching
+                months doesn't require scrolling back up past the time slots below. */}
+            <div className="sticky top-[170px] sm:top-[194px] z-30 bg-white flex items-center justify-between mb-4 py-1">
               <button
                 onClick={() => {
                   if (!canGoToPrevMonth) return;

@@ -100,7 +100,21 @@ export default function BookingApp() {
           <div className="booking-step-enter flex-1 flex flex-col">
             <CategorySelect
               onSelect={(cat: string) => {
-                updateBooking({ category: cat });
+                // Services are category-scoped, so a previous category's leftover
+                // service/extras selection must not silently carry its price/duration
+                // into a newly chosen category.
+                updateBooking({
+                  category: cat,
+                  technicianId: null,
+                  technicianName: "",
+                  service: "",
+                  extras: [],
+                  estimatedPrice: 0,
+                  priceIsEstimate: false,
+                  duration: 60,
+                  date: "",
+                  time: "",
+                });
                 setStep("technician");
               }}
               onBack={() => setStep("hero")}

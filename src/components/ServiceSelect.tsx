@@ -24,12 +24,13 @@ export default function ServiceSelect({ bookingData, updateBooking, onContinue, 
   }, [bookingData.category]);
 
   // Nails is fully multi-select: clients commonly combine several nail services in one visit.
+  // Extras (e.g. Eyebrows & Moustache) are only offered alongside nails, not lashes.
   const isMultiCategory = bookingData.category === "nails";
   const categoryServices = catalog.filter((item) => item.category === bookingData.category);
   const mainServices = isMultiCategory ? [] : categoryServices.filter((item) => !COMBINABLE_SERVICE_NAMES.includes(item.name));
   const addOns = [
     ...(isMultiCategory ? categoryServices : categoryServices.filter((item) => COMBINABLE_SERVICE_NAMES.includes(item.name))),
-    ...catalog.filter((item) => item.category === "extras"),
+    ...(isMultiCategory ? catalog.filter((item) => item.category === "extras") : []),
   ];
 
   const selectedNames = useMemo(() => [bookingData.service, ...bookingData.extras].filter(Boolean), [bookingData.service, bookingData.extras]);
@@ -39,11 +40,18 @@ export default function ServiceSelect({ bookingData, updateBooking, onContinue, 
     duration: selected.reduce((sum, item) => sum + item.duration, 0),
     estimate: selected.some((item) => item.priceMax !== null),
   }), [selected]);
+  // Eyebrows & Moustache (and any other pure add-on) can never stand alone as the booking's service.
+  const hasCoreService = selected.some((item) => item.category !== "extras");
 
   const commitSelection = (names: string[]) => {
-    const [service, ...extras] = names;
     const items = catalog.filter((item) => names.includes(item.name));
-    updateBooking({ service: service || "", extras, estimatedPrice: items.reduce((sum, item) => sum + (item.price || 0), 0), priceIsEstimate: items.some((item) => item.priceMax !== null), duration: items.reduce((sum, item) => sum + item.duration, 0), date: "", time: "" });
+    // A genuine service (not an "extras" category add-on) always becomes the
+    // primary "service" field, regardless of click order, so an add-on can
+    // never end up standing in as the booking's core service.
+    const core = items.filter((item) => item.category !== "extras").map((item) => item.name);
+    const addOnNames = items.filter((item) => item.category === "extras").map((item) => item.name);
+    const [service, ...restCore] = core;
+    updateBooking({ service: service || "", extras: [...restCore, ...addOnNames], estimatedPrice: items.reduce((sum, item) => sum + (item.price || 0), 0), priceIsEstimate: items.some((item) => item.priceMax !== null), duration: items.reduce((sum, item) => sum + item.duration, 0), date: "", time: "" });
   };
   // Exclusive pick among mainServices; anything already toggled on (add-ons/extras) is kept.
   const selectMain = (name: string) => {
@@ -66,7 +74,8 @@ export default function ServiceSelect({ bookingData, updateBooking, onContinue, 
       )}
       {!isMultiCategory && addOns.length > 0 && <div><p className="text-xs uppercase tracking-wider text-gray-500 mb-3">Extras <span className="normal-case text-gray-400">(optional)</span></p><div className="flex flex-wrap gap-2">{addOns.map((extra) => <button key={extra.id} type="button" onClick={() => toggleSelection(extra.name)} className={`min-h-11 border px-4 text-sm ${selectedNames.includes(extra.name) ? "border-black bg-black text-white" : "border-gray-200"}`}>{extra.name} · {extra.priceLabel}</button>)}</div></div>}
       {bookingData.service && <div className="bg-gray-50 p-4 text-sm flex flex-wrap justify-between gap-2"><span>{summary.estimate ? "Estimated from " : ""}{summary.price.toLocaleString()} EGP</span><span>{summary.duration} minutes</span></div>}
-      <button type="button" disabled={!bookingData.service || loading} onClick={onContinue} className="w-full h-12 bg-black text-white text-sm font-medium disabled:bg-gray-100 disabled:text-gray-400">Choose Date & Time</button>
+      {bookingData.service && !hasCoreService && <p className="text-sm text-amber-600">Eyebrows & Moustache must be booked together with another service.</p>}
+      <button type="button" disabled={!bookingData.service || !hasCoreService || loading} onClick={onContinue} className="w-full h-12 bg-black text-white text-sm font-medium disabled:bg-gray-100 disabled:text-gray-400">Choose Date & Time</button>
     </main>
   </div>;
 }
