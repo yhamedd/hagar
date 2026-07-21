@@ -628,7 +628,7 @@ export default function AdminPage() {
             <div className="grid gap-3">
               {techs.map((t) => {
                 const tb = bookings.filter((b) => b.bookings.technicianId === t.id);
-                const done = tb.filter((b) => b.bookings.status === "confirmed" || b.bookings.status === "completed").length;
+                const done = tb.filter((b) => b.bookings.status === "completed").length;
                 const today = new Date().toISOString().split("T")[0];
                 const up = tb.filter((b) => b.bookings.status === "confirmed" && b.bookings.bookingDate >= today).length;
                 const rev = tb.filter((b) => b.bookings.status === "confirmed" || b.bookings.status === "completed").reduce((s, b) => s + (b.bookings.price || 0), 0);
