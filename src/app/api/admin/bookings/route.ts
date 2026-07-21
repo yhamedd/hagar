@@ -58,6 +58,9 @@ export async function PUT(request: Request) {
       safeUpdates.price = Math.round(body.price);
       safeUpdates.priceIsEstimate = false;
     }
+    if (typeof body.duration === "number" && Number.isInteger(body.duration) && body.duration > 0 && body.duration <= 480) {
+      safeUpdates.duration = body.duration;
+    }
     if (body.bookingDate !== undefined) safeUpdates.bookingDate = body.bookingDate;
     if (body.bookingTime !== undefined) safeUpdates.bookingTime = nextTime;
 
@@ -67,7 +70,7 @@ export async function PUT(request: Request) {
         const techRows = await tx.select().from(technicians).where(eq(technicians.id, current.technicianId)).limit(1);
         const tech = techRows[0];
         const weekday = new Date(`${nextDate}T00:00:00Z`).getUTCDay();
-        const nextDuration = current.duration || 60;
+        const nextDuration = (safeUpdates.duration as number | undefined) ?? current.duration ?? 60;
         if (!tech || !isDayAvailable(tech, weekday) || !generateTimeSlots(tech).includes(nextTime) || !appointmentFitsSchedule(tech, nextTime)) {
           throw new AdminBookingError("Time is outside the technician's schedule", 400);
         }
