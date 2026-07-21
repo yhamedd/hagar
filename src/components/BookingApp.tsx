@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import HeroSection from "./HeroSection";
 
@@ -66,6 +66,15 @@ export default function BookingApp() {
   const updateBooking = (data: Partial<BookingData>) => {
     setBookingData((prev) => ({ ...prev, ...data }));
   };
+
+  // Switching steps swaps the rendered component in place rather than
+  // navigating to a new page, so the browser never resets scroll on its
+  // own -- without this, staying scrolled down from the previous step
+  // can push the new step's top content (e.g. the first technician's
+  // name) out of view until the user manually scrolls back up.
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [step]);
 
   const goBack = () => {
     const steps: BookingStep[] = [
