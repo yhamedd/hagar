@@ -159,7 +159,7 @@ export default function QuestionnaireForm({
             <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} className="px-4 py-3 bg-red-50 border border-red-100 text-red-600 text-sm" role="alert">{error}</motion.div>
           )}
 
-          <button type="button" onClick={handleSubmit} disabled={submitting} className={`w-full h-12 text-sm font-medium tracking-wide transition-colors duration-150 ${submitting ? "bg-gray-100 text-gray-400 cursor-not-allowed" : "bg-black text-white hover:bg-gray-800 active:bg-gray-900"}`}>
+          <button type="button" onClick={handleSubmit} disabled={submitting || !bookingData.policyAcknowledged} className={`w-full h-12 text-sm font-medium tracking-wide transition-colors duration-150 ${submitting || !bookingData.policyAcknowledged ? "bg-gray-100 text-gray-400 cursor-not-allowed" : "bg-black text-white hover:bg-gray-800 active:bg-gray-900"}`}>
             {submitting ? (<span className="inline-flex items-center gap-2"><span className="w-4 h-4 border-2 border-gray-300 border-t-gray-500 rounded-full animate-spin" />Confirming...</span>) : "Confirm Booking"}
           </button>
         </motion.div>
