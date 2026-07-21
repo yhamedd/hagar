@@ -121,9 +121,6 @@ export default function QuestionnaireForm({
               {priceInfo.hasVariable && (
                 <p className="text-xs text-gray-400 mt-1">Final price may vary based on density and length</p>
               )}
-              <p className="text-xs text-gray-400 mt-1">
-                Estimated appointment time: {bookingData.duration} minutes
-              </p>
             </div>
           )}
 

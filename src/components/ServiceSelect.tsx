@@ -37,7 +37,6 @@ export default function ServiceSelect({ bookingData, updateBooking, onContinue, 
   const selected = useMemo(() => catalog.filter((item) => selectedNames.includes(item.name)), [catalog, selectedNames]);
   const summary = useMemo(() => ({
     price: selected.reduce((sum, item) => sum + (item.price || 0), 0),
-    duration: selected.reduce((sum, item) => sum + item.duration, 0),
     estimate: selected.some((item) => item.priceMax !== null),
   }), [selected]);
   // Eyebrows & Moustache (and any other pure add-on) can never stand alone as the booking's service.
@@ -73,7 +72,7 @@ export default function ServiceSelect({ bookingData, updateBooking, onContinue, 
         </div>
       )}
       {!isMultiCategory && addOns.length > 0 && <div><p className="text-xs uppercase tracking-wider text-gray-500 mb-3">Extras <span className="normal-case text-gray-400">(optional)</span></p><div className="flex flex-wrap gap-2">{addOns.map((extra) => <button key={extra.id} type="button" onClick={() => toggleSelection(extra.name)} className={`min-h-11 border px-4 text-sm ${selectedNames.includes(extra.name) ? "border-black bg-black text-white" : "border-gray-200"}`}>{extra.name} · {extra.priceLabel}</button>)}</div></div>}
-      {bookingData.service && <div className="bg-gray-50 p-4 text-sm flex flex-wrap justify-between gap-2"><span>{summary.estimate ? "Estimated from " : ""}{summary.price.toLocaleString()} EGP</span><span>{summary.duration} minutes</span></div>}
+      {bookingData.service && <div className="bg-gray-50 p-4 text-sm"><span>{summary.estimate ? "Estimated from " : ""}{summary.price.toLocaleString()} EGP</span></div>}
       {bookingData.service && !hasCoreService && <p className="text-sm text-amber-600">Eyebrows & Moustache must be booked together with another service.</p>}
       <button type="button" disabled={!bookingData.service || !hasCoreService || loading} onClick={onContinue} className="w-full h-12 bg-black text-white text-sm font-medium disabled:bg-gray-100 disabled:text-gray-400">Choose Date & Time</button>
     </main>
