@@ -67,6 +67,11 @@ export function isValidCategory(v: unknown): v is string {
   return typeof v === "string" && (ALLOWED_CATEGORIES as readonly string[]).includes(v);
 }
 
+const ALLOWED_SERVICE_CATEGORIES = ["lashes", "nails", "extras"] as const;
+export function isValidServiceCategory(v: unknown): v is string {
+  return typeof v === "string" && (ALLOWED_SERVICE_CATEGORIES as readonly string[]).includes(v);
+}
+
 const ALLOWED_SLOT_TYPES = ["range", "fixed"] as const;
 export function isValidSlotType(v: unknown): v is string {
   return typeof v === "string" && (ALLOWED_SLOT_TYPES as readonly string[]).includes(v);

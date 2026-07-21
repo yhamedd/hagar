@@ -7,10 +7,6 @@ import type { ServiceCatalogItem } from "@/lib/serviceCatalog";
 
 interface Props { bookingData: BookingData; updateBooking: (data: Partial<BookingData>) => void; onContinue: () => void; onBack: () => void }
 
-// Services that stay in their category but can be combined with another pick
-// from the same category rather than exclusively replacing it.
-const COMBINABLE_SERVICE_NAMES = ["Brow Lamination"];
-
 export default function ServiceSelect({ bookingData, updateBooking, onContinue, onBack }: Props) {
   const [catalog, setCatalog] = useState<ServiceCatalogItem[]>([]);
   const [error, setError] = useState("");
@@ -27,11 +23,8 @@ export default function ServiceSelect({ bookingData, updateBooking, onContinue, 
   // Extras (e.g. Eyebrows & Moustache) are only offered alongside nails, not lashes.
   const isMultiCategory = bookingData.category === "nails";
   const categoryServices = catalog.filter((item) => item.category === bookingData.category);
-  const mainServices = isMultiCategory ? [] : categoryServices.filter((item) => !COMBINABLE_SERVICE_NAMES.includes(item.name));
-  const addOns = [
-    ...(isMultiCategory ? categoryServices : categoryServices.filter((item) => COMBINABLE_SERVICE_NAMES.includes(item.name))),
-    ...(isMultiCategory ? catalog.filter((item) => item.category === "extras") : []),
-  ];
+  const mainServices = isMultiCategory ? [] : categoryServices;
+  const addOns = isMultiCategory ? [...categoryServices, ...catalog.filter((item) => item.category === "extras")] : [];
 
   const selectedNames = useMemo(() => [bookingData.service, ...bookingData.extras].filter(Boolean), [bookingData.service, bookingData.extras]);
   const selected = useMemo(() => catalog.filter((item) => selectedNames.includes(item.name)), [catalog, selectedNames]);

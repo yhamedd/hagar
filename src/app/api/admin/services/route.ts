@@ -3,7 +3,7 @@ import { asc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { services } from "@/db/schema";
 import { getSession } from "@/lib/auth";
-import { sanitizeText } from "@/lib/validate";
+import { sanitizeText, isValidServiceCategory } from "@/lib/validate";
 
 export async function GET() {
   if (!(await getSession())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -16,6 +16,10 @@ export async function PUT(request: Request) {
   const id = typeof body.id === "number" ? body.id : 0;
   if (!id) return NextResponse.json({ error: "Valid service ID is required" }, { status: 400 });
   const updates: Record<string, unknown> = { updatedAt: new Date() };
+  if (body.category !== undefined) {
+    if (!isValidServiceCategory(body.category)) return NextResponse.json({ error: "Invalid category" }, { status: 400 });
+    updates.category = body.category;
+  }
   if (typeof body.price === "number" && Number.isInteger(body.price) && body.price >= 0) updates.price = body.price;
   if (body.priceMax === null || (typeof body.priceMax === "number" && Number.isInteger(body.priceMax) && body.priceMax >= 0)) updates.priceMax = body.priceMax;
   if (typeof body.priceLabel === "string" && sanitizeText(body.priceLabel, 100)) updates.priceLabel = sanitizeText(body.priceLabel, 100);
