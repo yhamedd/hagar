@@ -8,6 +8,7 @@ import { generateTimeSlots, isDayAvailable } from "@/lib/slots";
 import { appointmentFitsSchedule, hasBookingConflict } from "@/lib/bookingConflicts";
 import { isValidBookingStatus, isValidDate, isValidTime, normalizePhone, sanitizePhone, sanitizeText } from "@/lib/validate";
 import { isUniqueViolation } from "@/lib/dbErrors";
+import { getAllowedServiceIds } from "@/lib/technicianServices";
 
 export async function GET(request: Request) {
   if (!(await getSession())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -117,10 +118,15 @@ export async function POST(request: Request) {
       const techRows = await tx.select().from(technicians).where(and(eq(technicians.id, technicianId), eq(technicians.active, true))).limit(1);
       const tech = techRows[0];
       if (!tech) throw new AdminBookingError("Technician not found", 404);
+      const allowedServiceIds = await getAllowedServiceIds(technicianId);
       const selectedServiceRows = await tx.select().from(services).where(and(eq(services.name, service), eq(services.active, true))).limit(1);
       const selectedService = selectedServiceRows[0];
       const selectedExtras = extras.length ? await tx.select().from(services).where(and(inArray(services.name, extras), eq(services.active, true), inArray(services.category, ["extras", tech.category]))) : [];
-      if (!selectedService || selectedService.category !== tech.category || selectedExtras.length !== extras.length) {
+      if (
+        !selectedService || selectedService.category !== tech.category || selectedExtras.length !== extras.length ||
+        (allowedServiceIds && !allowedServiceIds.has(selectedService.id)) ||
+        (allowedServiceIds && selectedExtras.some((extra) => extra.category !== "extras" && !allowedServiceIds.has(extra.id)))
+      ) {
         throw new AdminBookingError("Invalid service or extras for this technician", 400);
       }
       const duration = selectedService.duration + selectedExtras.reduce((sum, item) => sum + item.duration, 0);

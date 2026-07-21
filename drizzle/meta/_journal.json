@@ -57,6 +57,13 @@
       "when": 1784581800000,
       "tag": "0007_remove_unused_legacy_data",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1784600000000,
+      "tag": "0008_technician_services",
+      "breakpoints": true
     }
   ]
 }

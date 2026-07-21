@@ -12,12 +12,12 @@ export default function ServiceSelect({ bookingData, updateBooking, onContinue, 
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   useEffect(() => {
-    fetch("/api/services")
+    fetch(`/api/services?technicianId=${bookingData.technicianId}`)
       .then((response) => response.ok ? response.json() : Promise.reject())
       .then(setCatalog)
       .catch(() => setError("Services could not be loaded. Please try again."))
       .finally(() => setLoading(false));
-  }, [bookingData.category]);
+  }, [bookingData.category, bookingData.technicianId]);
 
   // Nails is fully multi-select: clients commonly combine several nail services in one visit.
   // Extras (e.g. Eyebrows & Moustache) are only offered alongside nails, not lashes.

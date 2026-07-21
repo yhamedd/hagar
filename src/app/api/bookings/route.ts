@@ -13,6 +13,7 @@ import {
 } from "@/lib/validate";
 import { checkRateLimit } from "@/lib/rateLimit";
 import { appointmentFitsSchedule, hasBookingConflict } from "@/lib/bookingConflicts";
+import { getAllowedServiceIds } from "@/lib/technicianServices";
 import { isUniqueViolation } from "@/lib/dbErrors";
 import { cairoNowParts } from "@/lib/cairoTime";
 
@@ -86,16 +87,22 @@ export async function POST(request: Request) {
       const technician = techRows[0];
       if (!technician) throw new BookingError("Technician not found", 404);
 
+      const allowedServiceIds = await getAllowedServiceIds(technicianId);
+
       const selectedServiceRows = await tx.select().from(services).where(and(eq(services.name, service), eq(services.active, true))).limit(1);
       const selectedService = selectedServiceRows[0];
-      if (!selectedService || selectedService.category !== technician.category) {
+      if (!selectedService || selectedService.category !== technician.category || (allowedServiceIds && !allowedServiceIds.has(selectedService.id))) {
         throw new BookingError("The selected service is not available for this technician", 400);
       }
       // Extras may be true add-ons ("extras" category) or additional services from the
       // technician's own category, so clients can combine several nail services, or pair
-      // a combinable lash treatment like Brow Lamination with a main lash service.
+      // a combinable lash treatment like Brow Lamination with a main lash service. Extras
+      // drawn from the technician's own category are still subject to their restriction list.
       const selectedExtras = extras.length ? await tx.select().from(services).where(and(inArray(services.name, extras), eq(services.active, true), inArray(services.category, ["extras", technician.category]))) : [];
-      if (selectedExtras.length !== extras.length) {
+      if (
+        selectedExtras.length !== extras.length ||
+        (allowedServiceIds && selectedExtras.some((extra) => extra.category !== "extras" && !allowedServiceIds.has(extra.id)))
+      ) {
         throw new BookingError("One or more selected extras are invalid", 400);
       }
       const duration = selectedService.duration + selectedExtras.reduce((sum, item) => sum + item.duration, 0);

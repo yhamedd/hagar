@@ -67,6 +67,19 @@ export const technicians = pgTable("technicians", {
   check("technicians_slot_interval_check", sql`${table.slotInterval} is null or ${table.slotInterval} between 5 and 480`),
 ]);
 
+// Restricts a technician to a specific subset of their category's services.
+// A technician with zero rows here is unrestricted (can perform any service
+// in their own category) -- this keeps every existing technician working
+// exactly as before; only technicians explicitly given rows become limited.
+export const technicianServices = pgTable("technician_services", {
+  id: serial("id").primaryKey(),
+  technicianId: integer("technician_id").references(() => technicians.id, { onDelete: "cascade" }).notNull(),
+  serviceId: integer("service_id").references(() => services.id, { onDelete: "cascade" }).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex("technician_services_unique_idx").on(table.technicianId, table.serviceId),
+]);
+
 // Blocked dates
 export const blockedDates = pgTable("blocked_dates", {
   id: serial("id").primaryKey(),
