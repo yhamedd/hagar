@@ -21,7 +21,7 @@ export default function StepHeader({
     <header className="sticky top-0 z-40 bg-white border-b border-gray-100">
       <div className="max-w-2xl mx-auto px-5 sm:px-6 pt-4 pb-5 sm:pt-5 sm:pb-6">
         {/* Back + Progress */}
-        <div className="grid grid-cols-3 items-center mb-4 sm:mb-5">
+        <div className="grid grid-cols-3 items-baseline mb-4 sm:mb-5">
           <div className="justify-self-start">
             {onBack && (
               <button
