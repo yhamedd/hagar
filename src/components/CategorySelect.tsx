@@ -8,7 +8,7 @@ const LASH_IMG = "/lashes-booking.jpg";
 const NAIL_IMG = "/nails-booking.jpg";
 
 const CATEGORIES = [
-  { id: "lashes", title: "Lashes", description: "Extensions, lifts, brow lamination & more", image: LASH_IMG },
+  { id: "lashes", title: "Lashes", description: "Extensions, lifts & more", image: LASH_IMG },
   { id: "nails", title: "Nails", description: "Gel, acrylic, manicure, pedicure & designs", image: NAIL_IMG },
 ] as const;
 

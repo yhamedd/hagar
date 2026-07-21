@@ -21,41 +21,41 @@ export default function StepHeader({
     <header className="sticky top-0 z-40 bg-white border-b border-gray-100">
       <div className="max-w-2xl mx-auto px-5 sm:px-6 pt-4 pb-5 sm:pt-5 sm:pb-6">
         {/* Back + Progress */}
-        <div className="flex items-center justify-between mb-4 sm:mb-5">
-          {onBack ? (
-            <button
-              onClick={onBack}
-              className="inline-flex items-center gap-1.5 text-sm text-gray-400 hover:text-black active:text-black transition-colors duration-150 -ml-1 py-1 px-1"
-              aria-label="Go back"
-            >
-              <svg
-                className="w-4 h-4"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-                aria-hidden="true"
+        <div className="grid grid-cols-3 items-center mb-4 sm:mb-5">
+          <div className="justify-self-start">
+            {onBack && (
+              <button
+                onClick={onBack}
+                className="inline-flex items-center gap-1.5 text-sm text-gray-400 hover:text-black active:text-black transition-colors duration-150 -ml-1 py-1 px-1"
+                aria-label="Go back"
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M15 19l-7-7 7-7"
-                />
-              </svg>
-              <span>Back</span>
-            </button>
-          ) : (
-            <div />
-          )}
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  aria-hidden="true"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M15 19l-7-7 7-7"
+                  />
+                </svg>
+                <span>Back</span>
+              </button>
+            )}
+          </div>
           <Image
             src="/hagar-lashes-logo.png"
             alt="Hagar Lashes"
             width={830}
             height={238}
             priority
-            className="h-10 sm:h-11 w-auto"
+            className="h-10 sm:h-11 w-auto justify-self-center"
           />
-          <span className="text-xs text-gray-400 uppercase tracking-wider">{step}/{totalSteps}</span>
+          <span className="justify-self-end text-xs text-gray-400 uppercase tracking-wider">{step}/{totalSteps}</span>
         </div>
 
         {/* Progress bar */}
