@@ -137,7 +137,7 @@ export default function QuestionnaireForm({
             <h3 className="text-sm font-semibold">Important Policies</h3>
             <div className="space-y-4 text-sm text-gray-600">
               <div className="space-y-2">
-                <p><strong className="text-black">Deposit Required:</strong> Pay <strong className="text-black">1,000 EGP</strong> via InstaPay <strong className="text-black">within 1 hour</strong> to confirm. Non-refundable.</p>
+                <p><strong className="text-black">Deposit Required:</strong> Pay <strong className="text-black">1,000 EGP</strong> via InstaPay <strong className="text-black">within 12 hours</strong> to confirm. Non-refundable.</p>
                 <div className="bg-gray-50 px-4 py-3">
                   <p className="text-xs uppercase tracking-wider text-gray-400 mb-1">InstaPay Number</p>
                   <p className="text-base font-semibold text-black tracking-wide">0100 006 2272</p>

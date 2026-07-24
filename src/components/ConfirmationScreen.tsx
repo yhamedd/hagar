@@ -40,9 +40,10 @@ export default function ConfirmationScreen({
     return () => clearInterval(interval);
   }, [expiresAt]);
 
-  const minutes = Math.floor(timeLeft / 60);
+  const hours = Math.floor(timeLeft / 3600);
+  const minutes = Math.floor((timeLeft % 3600) / 60);
   const seconds = timeLeft % 60;
-  const isUrgent = timeLeft < 10 * 60;
+  const isUrgent = timeLeft < 60 * 60;
   const isExpired = timeLeft <= 0;
 
   return (
@@ -180,7 +181,7 @@ export default function ConfirmationScreen({
                     isUrgent ? "text-amber-600" : "text-black"
                   }`}
                 >
-                  {minutes}:{seconds.toString().padStart(2, "0")}
+                  {hours > 0 ? `${hours}h ${minutes.toString().padStart(2, "0")}m` : `${minutes}:${seconds.toString().padStart(2, "0")}`}
                 </p>
               </>
             )}

@@ -3,10 +3,13 @@ import { bookings } from "@/db/schema";
 import { eq, and, lt } from "drizzle-orm";
 
 const THROTTLE_MS = 60 * 1000;
+// Deposit hold window: long enough that an overnight/sleeping admin still has
+// time to see the payment proof and manually confirm before it auto-cancels.
+export const DEPOSIT_HOLD_MS = 12 * 60 * 60 * 1000;
 const globalForCleanup = globalThis as typeof globalThis & { __hagarLastCleanupAt?: number };
 
 /**
- * Auto-cancel any "pending_deposit" booking older than 1 hour.
+ * Auto-cancel any "pending_deposit" booking older than DEPOSIT_HOLD_MS.
  * Called on slot/availability checks and booking list endpoints
  * to keep stale holds from blocking the calendar. Throttled because
  * these endpoints are hit on every calendar/slot request; running the
@@ -18,7 +21,7 @@ export async function cleanupStaleBookings() {
   if (globalForCleanup.__hagarLastCleanupAt && now - globalForCleanup.__hagarLastCleanupAt < THROTTLE_MS) return;
   globalForCleanup.__hagarLastCleanupAt = now;
 
-  const oneHourAgo = new Date(now - 60 * 60 * 1000);
+  const cutoff = new Date(now - DEPOSIT_HOLD_MS);
 
   await db
     .update(bookings)
@@ -26,7 +29,7 @@ export async function cleanupStaleBookings() {
     .where(
       and(
         eq(bookings.status, "pending_deposit"),
-        lt(bookings.createdAt, oneHourAgo)
+        lt(bookings.createdAt, cutoff)
       )
     );
 }

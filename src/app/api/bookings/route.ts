@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { blockedDates, bookings, clients, services, technicians } from "@/db/schema";
 import { and, eq, inArray, sql } from "drizzle-orm";
-import { cleanupStaleBookings } from "@/lib/cleanupBookings";
+import { cleanupStaleBookings, DEPOSIT_HOLD_MS } from "@/lib/cleanupBookings";
 import { generateTimeSlots, isDayAvailable } from "@/lib/slots";
 import {
   isValidDate,
@@ -183,7 +183,7 @@ export async function POST(request: Request) {
       duration: result.booking.duration,
       priceIsEstimate: result.booking.priceIsEstimate,
       status: result.booking.status,
-      expiresAt: new Date(result.booking.createdAt.getTime() + 60 * 60 * 1000).toISOString(),
+      expiresAt: new Date(result.booking.createdAt.getTime() + DEPOSIT_HOLD_MS).toISOString(),
       message: "Booking created successfully!",
     });
   } catch (error) {
