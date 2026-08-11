@@ -44,6 +44,9 @@ export async function PUT(request: Request) {
     if (body.status !== undefined && !isValidBookingStatus(body.status)) return NextResponse.json({ error: "Invalid status" }, { status: 400 });
     if (body.bookingDate !== undefined && !isValidDate(body.bookingDate)) return NextResponse.json({ error: "Invalid date" }, { status: 400 });
     if (body.bookingTime !== undefined && !isValidTime(body.bookingTime)) return NextResponse.json({ error: "Invalid time" }, { status: 400 });
+    if (body.technicianId !== undefined && (typeof body.technicianId !== "number" || body.technicianId <= 0)) {
+      return NextResponse.json({ error: "Invalid technician" }, { status: 400 });
+    }
 
     const currentRows = await db.select().from(bookings).where(eq(bookings.id, id)).limit(1);
     const current = currentRows[0];
@@ -52,8 +55,10 @@ export async function PUT(request: Request) {
     const nextDate = body.bookingDate ?? current.bookingDate;
     const nextTime = body.bookingTime?.slice(0, 5) ?? current.bookingTime.slice(0, 5);
     const nextStatus = body.status ?? current.status;
+    const nextTechnicianId: number = body.technicianId ?? current.technicianId;
     const safeUpdates: Record<string, unknown> = { updatedAt: new Date() };
     if (body.status !== undefined) safeUpdates.status = body.status;
+    if (body.technicianId !== undefined) safeUpdates.technicianId = nextTechnicianId;
     if (typeof body.adminNotes === "string") safeUpdates.adminNotes = sanitizeText(body.adminNotes, 500);
     if (typeof body.price === "number" && Number.isFinite(body.price) && body.price >= 0) {
       safeUpdates.price = Math.round(body.price);
@@ -66,21 +71,31 @@ export async function PUT(request: Request) {
     if (body.bookingTime !== undefined) safeUpdates.bookingTime = nextTime;
 
     await db.transaction(async (tx) => {
-      await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`${current.technicianId}:${nextDate}`}))`);
+      await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`${nextTechnicianId}:${nextDate}`}))`);
       if (nextStatus === "confirmed" || nextStatus === "pending_deposit") {
-        const techRows = await tx.select().from(technicians).where(eq(technicians.id, current.technicianId)).limit(1);
+        const techRows = await tx.select().from(technicians).where(and(eq(technicians.id, nextTechnicianId), eq(technicians.active, true))).limit(1);
         const tech = techRows[0];
         const weekday = new Date(`${nextDate}T00:00:00Z`).getUTCDay();
         const nextDuration = (safeUpdates.duration as number | undefined) ?? current.duration ?? 60;
         if (!tech || !isDayAvailable(tech, weekday) || !generateTimeSlots(tech).includes(nextTime) || !appointmentFitsSchedule(tech, nextTime)) {
           throw new AdminBookingError("Time is outside the technician's schedule", 400);
         }
+        if (body.technicianId !== undefined && nextTechnicianId !== current.technicianId) {
+          // Reassigning to a different technician: the service must still fit their
+          // category and any per-technician service restriction.
+          const serviceRows = await tx.select().from(services).where(eq(services.name, current.service)).limit(1);
+          const serviceRow = serviceRows[0];
+          const allowedServiceIds = await getAllowedServiceIds(nextTechnicianId);
+          if (!serviceRow || serviceRow.category !== tech.category || (allowedServiceIds && !allowedServiceIds.has(serviceRow.id))) {
+            throw new AdminBookingError("This service isn't available for the selected technician", 400);
+          }
+        }
         const blocked = await tx.select({ id: blockedDates.id }).from(blockedDates).where(and(
-          eq(blockedDates.technicianId, current.technicianId), eq(blockedDates.blockedDate, nextDate)
+          eq(blockedDates.technicianId, nextTechnicianId), eq(blockedDates.blockedDate, nextDate)
         )).limit(1);
         if (blocked.length) throw new AdminBookingError("Technician is blocked on this date", 409);
         const collision = await tx.select({ bookingTime: bookings.bookingTime, duration: bookings.duration }).from(bookings).where(and(
-          eq(bookings.technicianId, current.technicianId), eq(bookings.bookingDate, nextDate),
+          eq(bookings.technicianId, nextTechnicianId), eq(bookings.bookingDate, nextDate),
           ne(bookings.id, id), sql`${bookings.status} in ('confirmed', 'pending_deposit')`
         ));
         if (hasBookingConflict(collision, nextTime, nextDuration)) throw new AdminBookingError("This time overlaps another appointment", 409);
