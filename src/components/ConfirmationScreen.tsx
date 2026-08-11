@@ -218,7 +218,7 @@ export default function ConfirmationScreen({
               </span>
               <div className="flex-1">
                 <p className="text-sm text-gray-600 mb-3">
-                  Send your payment screenshot on <strong className="text-black">both</strong> WhatsApp and Instagram:
+                  Please send your payment screenshot on <strong className="text-black">both</strong> WhatsApp and Instagram:
                 </p>
                 <a
                   href="https://wa.me/201000062272?text=Hi%2C%20I%20just%20made%20a%20deposit%20for%20my%20booking.%20Here%E2%80%99s%20my%20payment%20screenshot."
