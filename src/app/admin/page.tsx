@@ -230,6 +230,7 @@ export default function AdminPage() {
   const [actionMessage, setActionMessage] = useState<{ text: string; error: boolean } | null>(null);
   const [editTech, setEditTech] = useState<Technician | null>(null);
   const [savingTech, setSavingTech] = useState(false);
+  const [togglingId, setTogglingId] = useState<number | null>(null);
   const [portalUsername, setPortalUsername] = useState("technicians");
   const [portalPassword, setPortalPassword] = useState("");
   const [portalActive, setPortalActive] = useState(true);
@@ -338,6 +339,14 @@ export default function AdminPage() {
   const saveTech = async () => {
     if (!editTech) return; setSavingTech(true);
     try { await af("/api/admin/technicians", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(editTech) }); setEditTech(null); await loadTechs(); } finally { setSavingTech(false); }
+  };
+
+  const toggleTechActive = async (t: Technician) => {
+    setTogglingId(t.id);
+    try {
+      await af("/api/admin/technicians", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: t.id, active: !t.active }) });
+      await loadTechs();
+    } finally { setTogglingId(null); }
   };
 
   const savePortal = async () => {
@@ -688,7 +697,16 @@ export default function AdminPage() {
                               {t.slotType === "fixed" && t.fixedSlots && ` · ${t.fixedSlots.map((s) => formatTime12h(s)).join(", ")}`}
                             </p>
                           </div>
-                          {techs.length > 0 && <button onClick={() => setEditTech({ ...t })} className="text-xs text-gray-400 hover:text-black transition-colors shrink-0 ml-4">Edit</button>}
+                          <div className="flex items-center gap-3 shrink-0 ml-4">
+                            <button
+                              onClick={() => { if (t.active && !window.confirm(`Deactivate ${t.name}? They'll stop appearing for new bookings.`)) return; toggleTechActive(t); }}
+                              disabled={togglingId === t.id}
+                              className={`text-xs transition-colors disabled:opacity-50 ${t.active ? "text-gray-400 hover:text-red-600" : "text-gray-400 hover:text-green-700"}`}
+                            >
+                              {togglingId === t.id ? "…" : t.active ? "Deactivate" : "Reactivate"}
+                            </button>
+                            {techs.length > 0 && <button onClick={() => setEditTech({ ...t })} className="text-xs text-gray-400 hover:text-black transition-colors">Edit</button>}
+                          </div>
                         </div>
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                           <Stat value={done} label="Completed" />
