@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { blockedDates, bookings, clients, services, technicians } from "@/db/schema";
-import { and, desc, eq, ilike, inArray, ne, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, ilike, inArray, lte, ne, or, sql } from "drizzle-orm";
 import { getSession } from "@/lib/auth";
 import { cleanupStaleBookings } from "@/lib/cleanupBookings";
 import { generateTimeSlots, isDayAvailable } from "@/lib/slots";
@@ -19,6 +19,8 @@ export async function GET(request: Request) {
   const status = sanitizeText(searchParams.get("status"), 30);
   const technicianId = Number.parseInt(searchParams.get("technicianId") || "0", 10) || 0;
   const search = sanitizeText(searchParams.get("search"), 100);
+  const from = searchParams.get("from");
+  const to = searchParams.get("to");
   const conditions = [];
   if (status && status !== "all" && isValidBookingStatus(status)) conditions.push(eq(bookings.status, status));
   if (technicianId > 0) conditions.push(eq(bookings.technicianId, technicianId));
@@ -26,7 +28,22 @@ export async function GET(request: Request) {
     const pattern = `%${search}%`;
     conditions.push(or(ilike(bookings.clientName, pattern), ilike(bookings.clientPhone, pattern), ilike(bookings.service, pattern))!);
   }
+  // Calendar view: when a valid date range is supplied, return every booking in
+  // it (oldest first, capped) instead of a single page, so day/week/month grids
+  // never miss appointments that fall past a page boundary.
+  const rangeMode = isValidDate(from) && isValidDate(to) && from! <= to!;
+  if (rangeMode) {
+    conditions.push(gte(bookings.bookingDate, from!));
+    conditions.push(lte(bookings.bookingDate, to!));
+  }
   const where = conditions.length ? and(...conditions) : undefined;
+
+  if (rangeMode) {
+    const results = await db.select().from(bookings).innerJoin(technicians, eq(bookings.technicianId, technicians.id))
+      .where(where).orderBy(asc(bookings.bookingDate), asc(bookings.bookingTime)).limit(2000);
+    return NextResponse.json({ items: results, total: results.length, page: 1, pageSize: results.length, from, to });
+  }
+
   const [results, totals] = await Promise.all([
     db.select().from(bookings).innerJoin(technicians, eq(bookings.technicianId, technicians.id))
       .where(where).orderBy(desc(bookings.bookingDate), desc(bookings.bookingTime)).limit(pageSize).offset((page - 1) * pageSize),

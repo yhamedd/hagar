@@ -3,7 +3,7 @@ import { db } from "@/db";
 import { clients, bookings, technicians } from "@/db/schema";
 import { eq, desc, ilike, or, sql, inArray } from "drizzle-orm";
 import { getSession } from "@/lib/auth";
-import { sanitizeText, sanitizePhone, normalizePhone } from "@/lib/validate";
+import { sanitizeText, sanitizePhone, normalizePhone, parseId } from "@/lib/validate";
 
 export async function GET(request: Request) {
   const session = await getSession();
@@ -11,14 +11,14 @@ export async function GET(request: Request) {
 
   const { searchParams } = new URL(request.url);
   const search = searchParams.get("search")?.trim() || "";
-  const clientId = searchParams.get("id");
+  const clientIdParam = searchParams.get("id");
   const page = Math.max(1, Number.parseInt(searchParams.get("page") || "1", 10) || 1);
   const pageSize = Math.min(100, Math.max(10, Number.parseInt(searchParams.get("pageSize") || "25", 10) || 25));
 
   // Single client with bookings
-  if (clientId) {
-    const id = parseInt(clientId, 10);
-    if (isNaN(id)) return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
+  if (clientIdParam !== null) {
+    const id = parseId(clientIdParam);
+    if (id === null) return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
 
     const clientRows = await db.select().from(clients).where(eq(clients.id, id)).limit(1);
     if (clientRows.length === 0) return NextResponse.json({ error: "Not found" }, { status: 404 });

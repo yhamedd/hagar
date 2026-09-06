@@ -1,0 +1,29 @@
+name: Cancel stale deposit holds
+
+# Releases "pending_deposit" bookings older than the 12h hold window so the
+# calendar never stays blocked by an unpaid slot between organic requests.
+# Requires two repository secrets:
+#   APP_URL      e.g. https://your-app.replit.app   (no trailing slash)
+#   CRON_SECRET  the same value set as an env var on the deployed app
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: cleanup-cron
+  cancel-in-progress: false
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call cleanup endpoint
+        run: |
+          curl --fail --silent --show-error --max-time 30 \
+            -X POST "${APP_URL}/api/cron/cleanup-bookings" \
+            -H "Authorization: Bearer ${CRON_SECRET}"
+        env:
+          APP_URL: ${{ secrets.APP_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}

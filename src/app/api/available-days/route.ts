@@ -15,8 +15,18 @@ import { parseId } from "@/lib/validate";
 import { appointmentFitsSchedule, hasBookingConflict } from "@/lib/bookingConflicts";
 import { findActiveTechnician, requestedDuration } from "@/lib/availability";
 import { cairoNowParts } from "@/lib/cairoTime";
+import { checkRateLimit } from "@/lib/rateLimit";
 
 export async function GET(request: Request) {
+  const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+  const { allowed, retryAfterSeconds } = await checkRateLimit(`availability:${ip}`, { max: 120, windowMs: 60_000 });
+  if (!allowed) {
+    return NextResponse.json(
+      { error: "Too many requests. Please slow down and try again." },
+      { status: 429, headers: { "Retry-After": String(retryAfterSeconds) } }
+    );
+  }
+
   await cleanupStaleBookings();
   const { searchParams } = new URL(request.url);
   const techId = parseId(searchParams.get("technicianId"));

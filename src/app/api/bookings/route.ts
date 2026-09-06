@@ -138,12 +138,16 @@ export async function POST(request: Request) {
       }
 
       const normalizedPhone = normalizePhone(clientPhone);
+      // A returning customer keeps the profile the salon already has on file.
+      // Whatever the customer typed this time is still captured on the booking
+      // row itself (clientName / clientPhone), so a typo can't rewrite a known
+      // client's name or phone -- only bump updatedAt to mark recent activity.
       const clientRows = await tx
         .insert(clients)
         .values({ name: clientName, phone: clientPhone, phoneNormalized: normalizedPhone })
         .onConflictDoUpdate({
           target: clients.phoneNormalized,
-          set: { name: clientName, phone: clientPhone, updatedAt: new Date() },
+          set: { updatedAt: new Date() },
         })
         .returning({ id: clients.id });
 

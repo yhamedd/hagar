@@ -1,7 +1,7 @@
 import bcrypt from "bcryptjs";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "./index";
-import { adminUsers, technicianPortalUsers, technicians } from "./schema";
+import { adminUsers, services, technicianPortalUsers, technicianServices, technicians } from "./schema";
 
 const DEFAULT_TECHNICIANS = [
   { name: "Hagar", category: "lashes", slotType: "range", availableDays: [0, 1, 2, 3, 4], startTime: "13:00", endTime: "19:00", slotInterval: 60, active: true },
@@ -37,11 +37,47 @@ async function seedTechnicianPortal() {
   await db.insert(technicianPortalUsers).values({ username, passwordHash: await bcrypt.hash(password, 12) });
 }
 
+// Technicians who do not perform every service in their category. Each entry
+// restricts the technician to their category's services minus the excluded
+// names (mirrors migration 0009). Skipped when an admin has already customised
+// that technician's service list.
+const TECHNICIAN_SERVICE_EXCLUSIONS: Record<string, string[]> = {
+  Nada: ["Volume 3D"],
+};
+
+async function seedTechnicianServiceRestrictions() {
+  for (const [name, excludedServices] of Object.entries(TECHNICIAN_SERVICE_EXCLUSIONS)) {
+    const [technician] = await db
+      .select({ id: technicians.id, category: technicians.category })
+      .from(technicians)
+      .where(eq(technicians.name, name))
+      .limit(1);
+    if (!technician) continue;
+
+    const existing = await db
+      .select({ id: technicianServices.id })
+      .from(technicianServices)
+      .where(eq(technicianServices.technicianId, technician.id))
+      .limit(1);
+    if (existing.length) continue;
+
+    const allowed = await db
+      .select({ id: services.id, name: services.name })
+      .from(services)
+      .where(and(eq(services.category, technician.category), eq(services.active, true)));
+    const rows = allowed
+      .filter((service) => !excludedServices.includes(service.name))
+      .map((service) => ({ technicianId: technician.id, serviceId: service.id }));
+    if (rows.length) await db.insert(technicianServices).values(rows).onConflictDoNothing();
+  }
+}
+
 async function seed() {
   const existingTechnicians = await db.select({ name: technicians.name }).from(technicians);
   const existingNames = new Set(existingTechnicians.map((technician) => technician.name));
   const missingTechnicians = DEFAULT_TECHNICIANS.filter((technician) => !existingNames.has(technician.name));
   if (missingTechnicians.length) await db.insert(technicians).values(missingTechnicians);
+  await seedTechnicianServiceRestrictions();
   await seedAdmin();
   await seedTechnicianPortal();
   console.log("Database seed is up to date.");

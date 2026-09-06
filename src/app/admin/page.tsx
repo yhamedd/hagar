@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
+import { addDays, addMonths, addWeeks, endOfMonth, endOfWeek, format, startOfMonth, startOfWeek } from "date-fns";
 import { formatTime12h } from "@/lib/timeFormat";
 import { generateTimeSlots } from "@/lib/slots";
 import type { ServiceCatalogItem } from "@/lib/serviceCatalog";
@@ -66,15 +67,19 @@ interface BlockedDate {
 // ────────────────────────────────────────────────────────
 const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-type Tab = "bookings" | "clients" | "technicians" | "blocked" | "manual";
+type Tab = "bookings" | "calendar" | "clients" | "technicians" | "blocked" | "manual";
 
 const TABS: { key: Tab; label: string }[] = [
   { key: "bookings", label: "Bookings" },
+  { key: "calendar", label: "Calendar" },
   { key: "clients", label: "Clients" },
   { key: "technicians", label: "Technicians" },
   { key: "blocked", label: "Schedule" },
   { key: "manual", label: "New Booking" },
 ];
+
+type CalView = "day" | "week" | "month";
+const CANCELLED_STATUSES = ["cancelled", "rescheduled"];
 
 const STATUSES = [
   { value: "pending_deposit", label: "Pending", bg: "bg-amber-50 text-amber-700" },
@@ -260,6 +265,15 @@ export default function AdminPage() {
   const [mBusy, setMBusy] = useState(false);
   const [mMsg, setMMsg] = useState("");
 
+  // ── Calendar ──
+  const [calView, setCalView] = useState<CalView>("day");
+  const [calCursor, setCalCursor] = useState(() => new Date());
+  const [calTech, setCalTech] = useState(0);
+  const [calItems, setCalItems] = useState<BookingRow[]>([]);
+  const [calLoading, setCalLoading] = useState(false);
+  const [calError, setCalError] = useState("");
+  const [calShowCancelled, setCalShowCancelled] = useState(false);
+
   // ── Derived ──
   const allT = techs;
   const tName = useCallback((id: number) => allT.find((t) => t.id === id)?.name ?? "—", [allT]);
@@ -270,6 +284,30 @@ export default function AdminPage() {
     const tech = allT.find((t) => t.id === mTech);
     return tech ? generateTimeSlots(tech).map((v) => ({ v, l: formatTime12h(v) })) : [];
   }, [allT, mTech]);
+
+  // ── Calendar derived ──
+  const calRange = useMemo(() => {
+    if (calView === "day") return { from: calCursor, to: calCursor };
+    if (calView === "week") return { from: startOfWeek(calCursor), to: endOfWeek(calCursor) };
+    return { from: startOfMonth(calCursor), to: endOfMonth(calCursor) };
+  }, [calView, calCursor]);
+  const calFrom = format(calRange.from, "yyyy-MM-dd");
+  const calTo = format(calRange.to, "yyyy-MM-dd");
+  const calGroups = useMemo(() => {
+    const map = new Map<string, BookingRow[]>();
+    for (const row of calItems) {
+      if (!calShowCancelled && CANCELLED_STATUSES.includes(row.bookings.status)) continue;
+      map.set(row.bookings.bookingDate, [...(map.get(row.bookings.bookingDate) || []), row]);
+    }
+    return [...map.entries()]
+      .sort((a, b) => (a[0] < b[0] ? -1 : 1))
+      .map(([date, rows]) => [date, [...rows].sort((a, b) => (a.bookings.bookingTime < b.bookings.bookingTime ? -1 : 1))] as [string, BookingRow[]]);
+  }, [calItems, calShowCancelled]);
+  const calVisibleCount = useMemo(() => calGroups.reduce((sum, [, rows]) => sum + rows.length, 0), [calGroups]);
+  const calRevenue = useMemo(
+    () => calGroups.reduce((sum, [, rows]) => sum + rows.reduce((s, r) => s + (r.bookings.status === "confirmed" || r.bookings.status === "completed" ? r.bookings.price || 0 : 0), 0), 0),
+    [calGroups]
+  );
 
   // ── Fetch helper ──
   const af = useCallback((url: string, opts?: RequestInit) =>
@@ -292,6 +330,21 @@ export default function AdminPage() {
     const r = await af(`/api/admin/clients?${query}`);
     if (r.ok) { const d = await r.json(); setClients(d.items); setClientTotal(d.total); }
   }, [af, clientQ, clientPage]);
+  const loadCalendar = useCallback(async () => {
+    setCalLoading(true);
+    setCalError("");
+    try {
+      const query = new URLSearchParams({ from: calFrom, to: calTo, status: "all", technicianId: String(calTech) });
+      const r = await af(`/api/admin/bookings?${query}`);
+      if (!r.ok) throw new Error();
+      const d = await r.json();
+      setCalItems(Array.isArray(d.items) ? d.items : []);
+    } catch {
+      setCalError("The calendar could not be loaded.");
+    } finally {
+      setCalLoading(false);
+    }
+  }, [af, calFrom, calTo, calTech]);
 
   // ── Init ──
   useEffect(() => {
@@ -318,6 +371,12 @@ export default function AdminPage() {
   }, [auth, loadBookings]);
 
   useEffect(() => {
+    if (auth !== "ok" || tab !== "calendar") return;
+    const timer = window.setTimeout(() => loadCalendar(), 200);
+    return () => window.clearTimeout(timer);
+  }, [auth, tab, loadCalendar]);
+
+  useEffect(() => {
     if (auth !== "ok") return;
     const timer = window.setTimeout(() => loadClients(), 250);
     return () => window.clearTimeout(timer);
@@ -332,9 +391,18 @@ export default function AdminPage() {
       const d = await r.json().catch(() => ({}));
       if (!r.ok) { setActionMessage({ text: d.error || "Could not update booking", error: true }); return; }
       setActionMessage({ text: "Booking status updated", error: false });
-      await loadBookings();
+      await Promise.all([loadBookings(), tab === "calendar" ? loadCalendar() : Promise.resolve()]);
     } finally { setUpdatingId(null); }
   };
+
+  const moveCal = (dir: -1 | 1) =>
+    setCalCursor((d) => (calView === "day" ? addDays(d, dir) : calView === "week" ? addWeeks(d, dir) : addMonths(d, dir)));
+  const calTitle =
+    calView === "day"
+      ? format(calCursor, "EEEE, MMMM d, yyyy")
+      : calView === "week"
+        ? `${format(calRange.from, "MMM d")} – ${format(calRange.to, "MMM d, yyyy")}`
+        : format(calCursor, "MMMM yyyy");
 
   const saveTech = async () => {
     if (!editTech) return; setSavingTech(true);
@@ -493,6 +561,122 @@ export default function AdminPage() {
                   </table>
                 </div>
                 <Pagination page={bookingPage} total={bookingTotal} pageSize={25} onPage={setBookingPage} />
+              </div>
+            )}
+          </section>
+        )}
+
+        {/* ═══════════════ CALENDAR ═══════════════ */}
+        {tab === "calendar" && (
+          <section>
+            <div className="flex flex-wrap items-center gap-2 mb-4">
+              <h2 className="text-lg font-medium mr-auto">Calendar</h2>
+              <select
+                value={calTech}
+                onChange={(e) => setCalTech(+e.target.value)}
+                aria-label="Filter calendar by technician"
+                className="h-10 sm:h-8 text-xs border border-gray-200 px-2 focus:outline-none focus:border-black"
+              >
+                <option value={0}>All techs</option>
+                {allT.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+              </select>
+              <div className="inline-grid grid-cols-3 border border-gray-200">
+                {(["day", "week", "month"] as CalView[]).map((option) => (
+                  <button
+                    key={option}
+                    type="button"
+                    onClick={() => setCalView(option)}
+                    className={`h-10 sm:h-8 px-3 text-xs capitalize transition-colors ${calView === option ? "bg-black text-white" : "bg-white text-gray-500 hover:text-black"}`}
+                  >
+                    {option}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between gap-3 mb-4">
+              <div className="min-w-0">
+                <p className="text-sm font-medium truncate">{calTitle}</p>
+                <p className="text-xs text-gray-400">
+                  {calVisibleCount} appointment{calVisibleCount === 1 ? "" : "s"}
+                  {calRevenue > 0 && ` · ${fmtPrice(calRevenue)} booked`}
+                </p>
+              </div>
+              <div className="flex items-center gap-1.5 shrink-0">
+                <button type="button" onClick={() => moveCal(-1)} aria-label="Previous period" className="w-9 h-9 sm:w-8 sm:h-8 border border-gray-200 hover:border-black transition-colors">←</button>
+                <button type="button" onClick={() => setCalCursor(new Date())} className="h-9 sm:h-8 px-3 border border-gray-200 text-xs hover:border-black transition-colors">Today</button>
+                <button type="button" onClick={() => moveCal(1)} aria-label="Next period" className="w-9 h-9 sm:w-8 sm:h-8 border border-gray-200 hover:border-black transition-colors">→</button>
+              </div>
+            </div>
+
+            <label className="flex items-center gap-2 text-xs text-gray-500 mb-4">
+              <input type="checkbox" checked={calShowCancelled} onChange={(e) => setCalShowCancelled(e.target.checked)} />
+              Show cancelled &amp; rescheduled
+            </label>
+
+            {calError && (
+              <div role="alert" className="mb-4 flex items-center justify-between gap-4 border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
+                <span>{calError}</span>
+                <button type="button" onClick={loadCalendar} className="underline">Retry</button>
+              </div>
+            )}
+
+            {calLoading ? (
+              <div className="space-y-2">{[1, 2, 3, 4].map((i) => <div key={i} className="h-16 skeleton" />)}</div>
+            ) : calGroups.length === 0 ? (
+              <p className="text-gray-400 text-sm py-12 text-center">No appointments in this period.</p>
+            ) : (
+              <div className="space-y-6">
+                {calGroups.map(([date, rows]) => (
+                  <div key={date}>
+                    <div className="flex items-baseline justify-between mb-2 border-b border-gray-100 pb-1.5">
+                      <h3 className="text-sm font-medium">{fmtDate(date)}</h3>
+                      <span className="text-xs text-gray-400">{rows.length} appointment{rows.length === 1 ? "" : "s"}</span>
+                    </div>
+                    <div className="space-y-2">
+                      {rows.map((r) => (
+                        <article key={r.bookings.id} className="bg-white border border-gray-200 border-l-2 border-l-black px-4 py-3 flex flex-wrap items-start gap-x-4 gap-y-2">
+                          <time className="w-16 shrink-0 text-sm font-semibold tabular-nums pt-0.5">{formatTime12h(r.bookings.bookingTime)}</time>
+                          <div className="min-w-0 flex-1">
+                            <button
+                              type="button"
+                              onClick={() => r.bookings.clientId && openClient(r.bookings.clientId)}
+                              className="text-left group disabled:cursor-default"
+                              disabled={!r.bookings.clientId}
+                            >
+                              <span className={`text-sm font-medium ${r.bookings.clientId ? "group-hover:underline" : ""}`}>{r.bookings.clientName}</span>
+                              <span className="block text-[11px] text-gray-400">{r.bookings.clientPhone}</span>
+                            </button>
+                            <p className="text-xs text-gray-500 mt-1">
+                              {r.bookings.service}
+                              <span className="text-gray-400"> · {r.technicians?.name || tName(r.bookings.technicianId)} · {r.bookings.duration || 60} min</span>
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-3 shrink-0">
+                            <span className="text-sm text-gray-600">
+                              {fmtPrice(r.bookings.price)}
+                              {r.bookings.priceIsEstimate ? <span className="block text-[10px] text-amber-600">Estimate</span> : null}
+                            </span>
+                            <Badge status={r.bookings.status} />
+                            {updatingId === r.bookings.id ? (
+                              <span className="text-[11px] text-gray-400 w-20 text-center">…</span>
+                            ) : (
+                              <select
+                                value=""
+                                onChange={(e) => e.target.value && changeStatus(r.bookings.id, e.target.value)}
+                                aria-label={`Change status for ${r.bookings.clientName}`}
+                                className="text-[11px] border border-gray-200 px-1.5 py-1 focus:outline-none focus:border-black bg-white"
+                              >
+                                <option value="">Change…</option>
+                                {STATUSES.filter((s) => s.value !== r.bookings.status).map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+                              </select>
+                            )}
+                          </div>
+                        </article>
+                      ))}
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
           </section>

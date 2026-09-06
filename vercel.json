@@ -1,3 +1,8 @@
 {
-  "buildCommand": "npm run db:migrate && npm run build"
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "nextjs",
+  "buildCommand": "bash scripts/vercel-build.sh",
+  "crons": [
+    { "path": "/api/cron/cleanup-bookings", "schedule": "0 3 * * *" }
+  ]
 }

@@ -5,8 +5,11 @@ import { db } from "@/db";
 import { adminUsers, technicianPortalUsers } from "@/db/schema";
 
 function getJwtSecret() {
+  // The built-in fallback is only ever used under `next dev` (NODE_ENV is
+  // exactly "development" then). Production and test builds must supply a real
+  // JWT_SECRET or token signing/verification fails closed.
   const secret = process.env.JWT_SECRET ||
-    (process.env.NODE_ENV !== "production" ? "hagar-local-development-secret-change-before-production" : undefined);
+    (process.env.NODE_ENV === "development" ? "hagar-local-development-secret-change-before-production" : undefined);
   if (!secret || secret.length < 32) {
     throw new Error("JWT_SECRET must be set to at least 32 characters");
   }
