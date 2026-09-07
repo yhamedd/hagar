@@ -42,7 +42,7 @@ async function seedTechnicianPortal() {
 // names (mirrors migration 0009). Skipped when an admin has already customised
 // that technician's service list.
 const TECHNICIAN_SERVICE_EXCLUSIONS: Record<string, string[]> = {
-  Nada: ["Volume 3D"],
+  Nada: ["Volume 3D", "Volume 3D Refill"],
 };
 
 async function seedTechnicianServiceRestrictions() {
