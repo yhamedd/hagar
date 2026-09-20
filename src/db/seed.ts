@@ -39,10 +39,11 @@ async function seedTechnicianPortal() {
 
 // Technicians who do not perform every service in their category. Each entry
 // restricts the technician to their category's services minus the excluded
-// names (mirrors migration 0009). Skipped when an admin has already customised
+// names (mirrors migrations 0009-0011). Skipped when an admin has already customised
 // that technician's service list.
 const TECHNICIAN_SERVICE_EXCLUSIONS: Record<string, string[]> = {
   Nada: ["Volume 3D", "Volume 3D Refill"],
+  Marwa: ["Pedicure & Manicure", "Special Pedicure & Manicure", "Pedicure Hand", "Pedicure Feet"],
 };
 
 async function seedTechnicianServiceRestrictions() {

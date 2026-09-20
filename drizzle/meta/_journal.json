@@ -78,6 +78,13 @@
       "when": 1784700100000,
       "tag": "0010_nada_remove_volume_3d_refill",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1784700200000,
+      "tag": "0011_marwa_remove_mani_pedi",
+      "breakpoints": true
     }
   ]
 }
