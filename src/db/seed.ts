@@ -11,6 +11,7 @@ const DEFAULT_TECHNICIANS = [
   { name: "Marwa", category: "nails", slotType: "range", availableDays: [1, 2, 3, 4, 5, 6], startTime: "13:00", endTime: "21:00", slotInterval: 60, active: true },
   { name: "Habiba", category: "nails", slotType: "range", availableDays: [0, 1, 2, 3, 4, 6], startTime: "13:00", endTime: "21:00", slotInterval: 60, active: true },
   { name: "Doaa", category: "nails", slotType: "range", availableDays: [0, 1, 2, 3, 4, 6], startTime: "13:00", endTime: "21:00", slotInterval: 60, active: true },
+  { name: "Eman", category: "nails", slotType: "fixed", availableDays: [0, 1], fixedSlots: ["13:00", "14:30", "16:00"], active: true },
 ];
 
 async function seedAdmin() {

@@ -85,6 +85,13 @@
       "when": 1784700200000,
       "tag": "0011_marwa_remove_mani_pedi",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1784700300000,
+      "tag": "0012_add_eman_nail_technician",
+      "breakpoints": true
     }
   ]
 }
