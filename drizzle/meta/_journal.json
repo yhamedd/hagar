@@ -92,6 +92,13 @@
       "when": 1784700300000,
       "tag": "0012_add_eman_nail_technician",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1784700400000,
+      "tag": "0013_eman_lashes",
+      "breakpoints": true
     }
   ]
 }
