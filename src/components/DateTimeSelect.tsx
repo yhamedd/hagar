@@ -122,7 +122,6 @@ export default function DateTimeSelect({
     <div className="min-h-screen bg-white flex flex-col">
       <StepHeader
         step={4}
-        totalSteps={6}
         title="Pick a Date & Time"
         subtitle={`Available slots for ${technicianName}`}
         onBack={onBack}

@@ -5,6 +5,8 @@ import { addDays, addMonths, addWeeks, endOfMonth, endOfWeek, format, startOfMon
 import { formatTime12h } from "@/lib/timeFormat";
 import { generateTimeSlots } from "@/lib/slots";
 import type { ServiceCatalogItem } from "@/lib/serviceCatalog";
+import { reminderLink } from "@/lib/whatsapp";
+import { WhatsAppIcon } from "@/components/PaymentContact";
 
 // ────────────────────────────────────────────────────────
 // Types
@@ -39,6 +41,7 @@ interface BookingRow {
     status: string;
     notes: string | null;
     adminNotes: string | null;
+    reminderSentAt: string | null;
     createdAt: string;
   };
   technicians: { id: number; name: string; category: string };
@@ -117,6 +120,38 @@ const labelCls = "block text-xs text-gray-500 uppercase tracking-wider font-medi
 // ────────────────────────────────────────────────────────
 // Badge
 // ────────────────────────────────────────────────────────
+// Only upcoming appointments that are still going ahead can be reminded.
+const REMINDABLE_STATUSES = ["pending_deposit", "confirmed"];
+
+/**
+ * Opens WhatsApp (app or web) on a chat with the client, with the reminder
+ * already written -- the admin just presses send. Clicking also records the
+ * reminder so everyone on the dashboard can see it has been done.
+ */
+function RemindButton({ row, techName, onSent }: { row: BookingRow; techName: string; onSent: (id: number) => void }) {
+  const b = row.bookings;
+  if (!REMINDABLE_STATUSES.includes(b.status) || b.bookingDate < format(new Date(), "yyyy-MM-dd")) return null;
+  const href = reminderLink(b, techName);
+  if (!href) return <span className="text-[10px] text-gray-400" title="This phone number can't be used on WhatsApp">No WhatsApp no.</span>;
+  const sent = b.reminderSentAt ? new Date(b.reminderSentAt) : null;
+  return (
+    <span className="inline-flex flex-col items-start gap-0.5">
+      <a
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        onClick={() => onSent(b.id)}
+        title={`Send ${b.clientName} a WhatsApp reminder`}
+        className={`inline-flex items-center gap-1.5 h-7 px-2.5 text-[11px] font-medium whitespace-nowrap transition-colors ${sent ? "border border-[#25D366] text-[#128C4B] hover:bg-green-50" : "bg-[#25D366] text-white hover:bg-[#1ebe5d]"}`}
+      >
+        <WhatsAppIcon className="w-3.5 h-3.5" />
+        {sent ? "Remind again" : "Remind"}
+      </a>
+      {sent && <span className="text-[10px] text-gray-400 whitespace-nowrap">Reminded {format(sent, "MMM d, h:mm a")}</span>}
+    </span>
+  );
+}
+
 function Badge({ status }: { status: string }) {
   return <span className={`inline-block px-2 py-0.5 text-xs font-medium whitespace-nowrap ${sBg(status)}`}>{sLbl(status)}</span>;
 }
@@ -383,6 +418,20 @@ export default function AdminPage() {
   }, [auth, clientQ, clientPage, loadClients]);
 
   // ── Actions ──
+  // Fired as the WhatsApp chat opens: record the reminder and reflect it
+  // immediately in both the list and the calendar.
+  const markReminded = async (id: number) => {
+    const stamp = (rows: BookingRow[]) => rows.map((r) => (r.bookings.id === id ? { ...r, bookings: { ...r.bookings, reminderSentAt: new Date().toISOString() } } : r));
+    setBookings(stamp);
+    setCalItems(stamp);
+    try {
+      const r = await af("/api/admin/bookings/reminder", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) });
+      if (!r.ok) setActionMessage({ text: "WhatsApp opened, but the reminder could not be recorded", error: true });
+    } catch {
+      setActionMessage({ text: "WhatsApp opened, but the reminder could not be recorded", error: true });
+    }
+  };
+
   const changeStatus = async (id: number, status: string) => {
     setUpdatingId(id);
     setActionMessage(null);
@@ -527,6 +576,7 @@ export default function AdminPage() {
                         <th className="text-left px-4 py-2.5 font-medium">Date</th>
                         <th className="text-left px-4 py-2.5 font-medium">Price</th>
                         <th className="text-left px-4 py-2.5 font-medium">Status</th>
+                        <th className="text-left px-4 py-2.5 font-medium">Reminder</th>
                         <th className="text-left px-4 py-2.5 font-medium w-28"></th>
                       </tr>
                     </thead>
@@ -547,6 +597,7 @@ export default function AdminPage() {
                           </td>
                           <td className="px-4 py-2.5 text-gray-600">{fmtPrice(r.bookings.price)}{r.bookings.priceIsEstimate ? <span className="block text-[10px] text-amber-600">Estimate</span> : null}</td>
                           <td className="px-4 py-2.5"><Badge status={r.bookings.status} /></td>
+                          <td className="px-4 py-2.5"><RemindButton row={r} techName={r.technicians?.name || tName(r.bookings.technicianId)} onSent={markReminded} /></td>
                           <td className="px-4 py-2.5">
                             {updatingId === r.bookings.id ? <span className="text-[11px] text-gray-400">…</span> : (
                               <select value="" onChange={(e) => e.target.value && changeStatus(r.bookings.id, e.target.value)} className="text-[11px] border border-gray-200 px-1.5 py-1 focus:outline-none focus:border-black bg-white">
@@ -658,6 +709,7 @@ export default function AdminPage() {
                               {r.bookings.priceIsEstimate ? <span className="block text-[10px] text-amber-600">Estimate</span> : null}
                             </span>
                             <Badge status={r.bookings.status} />
+                            <RemindButton row={r} techName={r.technicians?.name || tName(r.bookings.technicianId)} onSent={markReminded} />
                             {updatingId === r.bookings.id ? (
                               <span className="text-[11px] text-gray-400 w-20 text-center">…</span>
                             ) : (

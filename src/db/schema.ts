@@ -111,6 +111,8 @@ export const bookings = pgTable("bookings", {
   notes: text("notes"),
   adminNotes: text("admin_notes"),
   managementTokenHash: varchar("management_token_hash", { length: 64 }).unique(),
+  // When the salon last sent this client a WhatsApp reminder (null = never).
+  reminderSentAt: timestamp("reminder_sent_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => [

@@ -1,8 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import HeroSection from "./HeroSection";
+import { EASE_OUT } from "./Motion";
 
 const StepFallback = () => <div className="min-h-screen bg-white" aria-busy="true" />;
 const CategorySelect = dynamic(() => import("./CategorySelect"), { loading: StepFallback });
@@ -13,14 +15,8 @@ const QuestionnaireForm = dynamic(() => import("./QuestionnaireForm"), { loading
 const ConfirmationScreen = dynamic(() => import("./ConfirmationScreen"), { loading: StepFallback });
 const Footer = dynamic(() => import("./Footer"));
 
-type BookingStep =
-  | "hero"
-  | "category"
-  | "technician"
-  | "service"
-  | "datetime"
-  | "questionnaire"
-  | "confirmation";
+const STEPS = ["hero", "category", "technician", "service", "datetime", "questionnaire", "confirmation"] as const;
+type BookingStep = (typeof STEPS)[number];
 
 export interface BookingData {
   category: string;
@@ -59,9 +55,20 @@ const initialBookingData: BookingData = {
 };
 
 export default function BookingApp() {
-  const [step, setStep] = useState<BookingStep>("hero");
+  const [step, setStepState] = useState<BookingStep>("hero");
   const [bookingData, setBookingData] = useState<BookingData>(initialBookingData);
   const [bookingResult, setBookingResult] = useState<Record<string, unknown> | null>(null);
+  // +1 when moving forward through the flow, -1 when going back: steps slide
+  // in from the side the client is travelling toward.
+  const [direction, setDirection] = useState(1);
+  const stepRef = useRef(step);
+  const reduceMotion = useReducedMotion();
+
+  const setStep = (next: BookingStep) => {
+    setDirection(STEPS.indexOf(next) >= STEPS.indexOf(stepRef.current) ? 1 : -1);
+    stepRef.current = next;
+    setStepState(next);
+  };
 
   const updateBooking = (data: Partial<BookingData>) => {
     setBookingData((prev) => ({ ...prev, ...data }));
@@ -77,16 +84,8 @@ export default function BookingApp() {
   }, [step]);
 
   const goBack = () => {
-    const steps: BookingStep[] = [
-      "hero",
-      "category",
-      "technician",
-      "service",
-      "datetime",
-      "questionnaire",
-    ];
-    const idx = steps.indexOf(step);
-    if (idx > 0) setStep(steps[idx - 1]);
+    const idx = STEPS.indexOf(step);
+    if (idx > 0) setStep(STEPS[idx - 1]);
   };
 
   const resetBooking = () => {
@@ -95,104 +94,101 @@ export default function BookingApp() {
     setStep("hero");
   };
 
+  const renderStep = () => {
+    switch (step) {
+      case "hero":
+        return <HeroSection onBook={() => setStep("category")} />;
+      case "category":
+        return (
+          <CategorySelect
+            onSelect={(cat: string) => {
+              // Services are category-scoped, so a previous category's leftover
+              // service/extras selection must not silently carry its price/duration
+              // into a newly chosen category.
+              updateBooking({
+                category: cat,
+                technicianId: null,
+                technicianName: "",
+                service: "",
+                extras: [],
+                estimatedPrice: 0,
+                priceIsEstimate: false,
+                duration: 60,
+                date: "",
+                time: "",
+              });
+              setStep("technician");
+            }}
+            onBack={goBack}
+          />
+        );
+      case "technician":
+        return (
+          <TechnicianSelect
+            category={bookingData.category}
+            onSelect={(id: number, name: string) => {
+              updateBooking({ technicianId: id, technicianName: name });
+              setStep("service");
+            }}
+            onBack={goBack}
+          />
+        );
+      case "service":
+        return <ServiceSelect bookingData={bookingData} updateBooking={updateBooking} onContinue={() => setStep("datetime")} onBack={goBack} />;
+      case "datetime":
+        return bookingData.technicianId ? (
+          <DateTimeSelect
+            technicianId={bookingData.technicianId}
+            technicianName={bookingData.technicianName}
+            duration={bookingData.duration}
+            onSelect={(date: string, time: string) => {
+              updateBooking({ date, time });
+              setStep("questionnaire");
+            }}
+            onBack={goBack}
+          />
+        ) : null;
+      case "questionnaire":
+        return (
+          <QuestionnaireForm
+            bookingData={bookingData}
+            updateBooking={updateBooking}
+            onSubmit={(result: Record<string, unknown>) => {
+              setBookingResult(result);
+              setStep("confirmation");
+            }}
+            onBack={goBack}
+          />
+        );
+      case "confirmation":
+        return <ConfirmationScreen bookingData={bookingData} bookingResult={bookingResult} onNewBooking={resetBooking} />;
+    }
+  };
+
+  // The hero and confirmation screens bring their own footer / none at all.
   const showFooter = step !== "hero" && step !== "confirmation";
+  const offset = reduceMotion ? 0 : 36 * direction;
 
   return (
-    <div className="min-h-screen flex flex-col">
-        {step === "hero" && (
-          <div className="booking-step-enter">
-            <HeroSection onBook={() => setStep("category")} />
-          </div>
-        )}
-
-        {step === "category" && (
-          <div className="booking-step-enter flex-1 flex flex-col">
-            <CategorySelect
-              onSelect={(cat: string) => {
-                // Services are category-scoped, so a previous category's leftover
-                // service/extras selection must not silently carry its price/duration
-                // into a newly chosen category.
-                updateBooking({
-                  category: cat,
-                  technicianId: null,
-                  technicianName: "",
-                  service: "",
-                  extras: [],
-                  estimatedPrice: 0,
-                  priceIsEstimate: false,
-                  duration: 60,
-                  date: "",
-                  time: "",
-                });
-                setStep("technician");
-              }}
-              onBack={() => setStep("hero")}
-            />
-            {showFooter && <Footer />}
-          </div>
-        )}
-
-        {step === "technician" && (
-          <div className="booking-step-enter flex-1 flex flex-col">
-            <TechnicianSelect
-              category={bookingData.category}
-              onSelect={(id: number, name: string) => {
-                updateBooking({ technicianId: id, technicianName: name });
-                setStep("service");
-              }}
-              onBack={goBack}
-            />
-            {showFooter && <Footer />}
-          </div>
-        )}
-
-        {step === "service" && (
-          <div className="booking-step-enter flex-1 flex flex-col">
-            <ServiceSelect bookingData={bookingData} updateBooking={updateBooking} onContinue={() => setStep("datetime")} onBack={goBack} />
-            {showFooter && <Footer />}
-          </div>
-        )}
-
-        {step === "datetime" && bookingData.technicianId && (
-          <div className="booking-step-enter flex-1 flex flex-col">
-            <DateTimeSelect
-              technicianId={bookingData.technicianId}
-              technicianName={bookingData.technicianName}
-              duration={bookingData.duration}
-              onSelect={(date: string, time: string) => {
-                updateBooking({ date, time });
-                setStep("questionnaire");
-              }}
-              onBack={goBack}
-            />
-            {showFooter && <Footer />}
-          </div>
-        )}
-
-        {step === "questionnaire" && (
-          <div className="booking-step-enter flex-1 flex flex-col">
-            <QuestionnaireForm
-              bookingData={bookingData}
-              updateBooking={updateBooking}
-              onSubmit={async (result: Record<string, unknown>) => {
-                setBookingResult(result);
-                setStep("confirmation");
-              }}
-              onBack={goBack}
-            />
-            {showFooter && <Footer />}
-          </div>
-        )}
-
-        {step === "confirmation" && (
-          <div className="booking-step-enter flex-1 flex flex-col">
-            <ConfirmationScreen
-              bookingData={bookingData}
-              bookingResult={bookingResult}
-              onNewBooking={resetBooking}
-            />
-          </div>
-        )}
+    <div className="min-h-screen flex flex-col overflow-x-clip">
+      <AnimatePresence mode="wait" initial={false} custom={offset}>
+        <motion.div
+          key={step}
+          custom={offset}
+          className="flex-1 flex flex-col"
+          variants={{
+            enter: (x: number) => ({ opacity: 0, x }),
+            center: { opacity: 1, x: 0, transition: { duration: 0.38, ease: EASE_OUT } },
+            exit: (x: number) => ({ opacity: 0, x: -x, transition: { duration: 0.16, ease: "easeIn" as const } }),
+          }}
+          initial="enter"
+          animate="center"
+          exit="exit"
+        >
+          {renderStep()}
+          {showFooter && <Footer />}
+        </motion.div>
+      </AnimatePresence>
     </div>
   );
 }

@@ -52,7 +52,6 @@ export default function TechnicianSelect({ category, onSelect, onBack }: Props) 
     <div className="min-h-screen bg-white flex flex-col">
       <StepHeader
         step={2}
-        totalSteps={6}
         title="Choose Your Technician"
         subtitle={`Select a ${category === "lashes" ? "lash" : "nail"} technician`}
         onBack={onBack}

@@ -98,19 +98,93 @@ input[type="checkbox"] {
   animation: shimmer 1.5s infinite;
 }
 
-@keyframes rise-in {
-  from { opacity: 0; transform: translate3d(0, 0.75rem, 0); }
-  to { opacity: 1; transform: translate3d(0, 0, 0); }
+/* ============================================
+   MOTION GRAPHICS
+   ============================================ */
+
+/* Landing nav slides down on load. `backwards` (not `both`) so no transform
+   lingers afterwards and the bar stays truly position: fixed. */
+@keyframes nav-drop {
+  from { transform: translate3d(0, -100%, 0); }
+  to { transform: translate3d(0, 0, 0); }
+}
+.nav-drop {
+  animation: nav-drop 600ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
 }
 
-.hero-reveal,
-.booking-step-enter {
-  animation: rise-in 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
+/* Soft rose light drifting behind the hero. */
+@keyframes glow-drift {
+  0% { transform: translate3d(-4%, -2%, 0) scale(1); }
+  50% { transform: translate3d(5%, 4%, 0) scale(1.12); }
+  100% { transform: translate3d(-4%, -2%, 0) scale(1); }
+}
+.hero-glow {
+  position: absolute;
+  inset: -20%;
+  pointer-events: none;
+  background:
+    radial-gradient(38% 34% at 72% 38%, rgba(244, 201, 189, 0.5), transparent 70%),
+    radial-gradient(30% 30% at 22% 72%, rgba(232, 222, 240, 0.55), transparent 70%);
+  filter: blur(30px);
+  animation: glow-drift 16s ease-in-out infinite;
 }
 
-.hero-reveal-delay-1 { animation-delay: 80ms; }
-.hero-reveal-delay-2 { animation-delay: 150ms; }
-.hero-reveal-delay-3 { animation-delay: 220ms; }
+/* Light sweep across the primary call to action. */
+@keyframes cta-shine {
+  0%, 55% { transform: translate3d(-130%, 0, 0) skewX(-20deg); }
+  100% { transform: translate3d(330%, 0, 0) skewX(-20deg); }
+}
+.cta-shine {
+  position: relative;
+  overflow: hidden;
+}
+.cta-shine::after {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 40%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.28), transparent);
+  animation: cta-shine 3.6s ease-in-out infinite;
+  pointer-events: none;
+}
+
+/* Service ticker */
+@keyframes marquee {
+  to { transform: translate3d(-50%, 0, 0); }
+}
+.marquee {
+  overflow: hidden;
+  border-block: 1px solid #f3f4f6;
+  padding-block: 1.1rem;
+  mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
+}
+.marquee-track {
+  display: flex;
+  width: max-content;
+  animation: marquee 38s linear infinite;
+}
+.marquee-group {
+  display: flex;
+  flex-shrink: 0;
+}
+.marquee-item {
+  display: flex;
+  align-items: center;
+  gap: 2.25rem;
+  padding-left: 2.25rem;
+  font-size: 0.8125rem;
+  font-weight: 300;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: #6b7280;
+  white-space: nowrap;
+}
+.marquee-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 9999px;
+  background: #d9a08f;
+}
 
 /* ============================================
    REDUCED MOTION
@@ -131,6 +205,13 @@ input[type="checkbox"] {
   .skeleton {
     animation: none;
     background: #f3f4f6;
+  }
+
+  .marquee-track,
+  .hero-glow,
+  .cta-shine::after,
+  .nav-drop {
+    animation: none;
   }
 }
 

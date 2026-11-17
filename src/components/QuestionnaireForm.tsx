@@ -6,6 +6,8 @@ import StepHeader from "./StepHeader";
 import type { BookingData } from "./BookingApp";
 import { format } from "date-fns";
 import { formatTime12h } from "@/lib/timeFormat";
+import PaymentContact from "./PaymentContact";
+import { SITE } from "@/lib/site";
 
 interface Props {
   bookingData: BookingData;
@@ -79,7 +81,6 @@ export default function QuestionnaireForm({
     <div className="min-h-screen bg-white flex flex-col">
       <StepHeader
         step={5}
-        totalSteps={6}
         title="Your Details"
         subtitle={
           bookingData.technicianName && bookingData.date && bookingData.time
@@ -137,31 +138,10 @@ export default function QuestionnaireForm({
             <h3 className="text-sm font-semibold">Important Policies</h3>
             <div className="space-y-4 text-sm text-gray-600">
               <div className="space-y-2">
-                <p><strong className="text-black">Deposit Required:</strong> Pay <strong className="text-black">1,000 EGP</strong> via InstaPay <strong className="text-black">within 12 hours</strong> to confirm. Non-refundable.</p>
-                <div className="bg-gray-50 px-4 py-3">
-                  <p className="text-xs uppercase tracking-wider text-gray-400 mb-1">InstaPay Number</p>
-                  <p className="text-base font-semibold text-black tracking-wide">0100 006 2272</p>
-                </div>
-                <p className="text-sm text-gray-600">Please send your payment screenshot on <strong className="text-black">both</strong> WhatsApp and Instagram:</p>
-                <div className="flex flex-wrap gap-2">
-                  <a href="https://wa.me/201000062272?text=Hi%2C%20I%20just%20made%20a%20deposit%20for%20my%20booking.%20Here%E2%80%99s%20my%20payment%20screenshot." target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 h-10 px-4 bg-[#25D366] text-white text-sm font-medium hover:bg-[#1ebe5d] transition-colors duration-150">
-                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" /></svg>
-                    Send Screenshot on WhatsApp
-                  </a>
-                  <a
-                    href="https://ig.me/m/hagar.lashes"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 h-10 px-4 text-white text-sm font-medium transition-opacity duration-150 hover:opacity-90"
-                    style={{ background: "linear-gradient(45deg, #feda75, #d62976, #4f5bd5)" }}
-                  >
-                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zm0 10.162a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z" /></svg>
-                    Send Screenshot on Instagram
-                  </a>
-                </div>
-                <p className="text-xs text-gray-400 mt-2">On Instagram, please include this message: &ldquo;Hi, I just made a deposit for my booking. Here&rsquo;s my payment screenshot.&rdquo;</p>
+                <p><strong className="text-black">Deposit Required:</strong> Pay <strong className="text-black">{SITE.depositEgp.toLocaleString()} EGP</strong> via InstaPay <strong className="text-black">within {SITE.depositHoldHours} hours</strong> to confirm. Non-refundable.</p>
+                <PaymentContact compact />
               </div>
-              <p><strong className="text-black">Late Policy:</strong> Booking is <strong className="text-black">automatically cancelled</strong> if more than <strong className="text-black">20 minutes late</strong>.</p>
+              <p><strong className="text-black">Late Policy:</strong> Booking is <strong className="text-black">automatically cancelled</strong> if more than <strong className="text-black">{SITE.lateGraceMinutes} minutes late</strong>.</p>
             </div>
             <label className="flex items-start gap-3 pt-2 cursor-pointer">
               <input type="checkbox" checked={bookingData.policyAcknowledged} onChange={(e) => updateBooking({ policyAcknowledged: e.target.checked })} className="mt-0.5" />

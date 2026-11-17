@@ -86,6 +86,12 @@ never touch the production database. The runtime refuses to start unless
 `DATABASE_ENVIRONMENT` matches the resolved environment (`production` on Vercel,
 since `REPLIT_DEPLOYMENT` is unset and `NODE_ENV=production`).
 
+## WhatsApp booking reminders
+
+In the admin dashboard, every upcoming booking that is pending or confirmed has a green **Remind** button (Bookings tab and Calendar tab). Clicking it opens WhatsApp on a chat with the client with the reminder already written (date, time, service, technician, location, and a deposit prompt when the booking is still pending) - press send in WhatsApp to deliver it. The message goes out from whichever WhatsApp account is signed in on that device, so no WhatsApp Business API account or credentials are needed.
+
+The dashboard records when a reminder was opened (`bookings.reminder_sent_at`) and shows "Reminded <date>" beside the booking. Local Egyptian numbers are converted to international format automatically; the message text lives in `src/lib/whatsapp.ts` and salon contact details in `src/lib/site.ts`.
+
 ## Data integrity and privacy
 
 - Normalized phone numbers are unique, preventing duplicate client profiles.
