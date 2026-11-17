@@ -60,6 +60,9 @@ export const technicians = pgTable("technicians", {
   slotInterval: integer("slot_interval").default(60),
   fixedSlots: jsonb("fixed_slots").$type<string[]>(),
   active: boolean("active").notNull().default(true),
+  // Set when an admin removes the technician for good. The row stays so past
+  // bookings keep their technician; a removed technician is always inactive.
+  removedAt: timestamp("removed_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => [
   check("technicians_category_check", sql`${table.category} in ('lashes', 'nails')`),

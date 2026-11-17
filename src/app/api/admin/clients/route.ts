@@ -1,9 +1,30 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { clients, bookings, technicians } from "@/db/schema";
-import { eq, desc, ilike, or, sql, inArray } from "drizzle-orm";
+import { eq, desc, ilike, or, sql } from "drizzle-orm";
+import { cairoNowParts } from "@/lib/cairoTime";
 import { getSession } from "@/lib/auth";
 import { sanitizeText, sanitizePhone, normalizePhone, parseId } from "@/lib/validate";
+
+const SORTS = ["recent", "name", "bookings", "spent", "upcoming", "lastBooking"] as const;
+type Sort = (typeof SORTS)[number];
+
+/**
+ * Per-client booking totals. "Spent" is what the client has actually paid for:
+ * completed appointments, plus confirmed ones whose date has already passed
+ * (not every visit gets marked completed). Future bookings are not money spent.
+ */
+function clientTotals(today: string) {
+  const s = bookings.status;
+  const d = bookings.bookingDate;
+  return db.select({
+    clientId: bookings.clientId,
+    totalBookings: sql<number>`count(*)::int`.as("total_bookings"),
+    totalSpent: sql<number>`coalesce(sum(${bookings.price}) filter (where ${s} = 'completed' or (${s} = 'confirmed' and ${d} < ${today})), 0)::int`.as("total_spent"),
+    upcoming: sql<number>`count(*) filter (where ${s} in ('pending_deposit', 'confirmed') and ${d} >= ${today})::int`.as("upcoming"),
+    lastBooking: sql<string | null>`max(${d})`.as("last_booking"),
+  }).from(bookings).groupBy(bookings.clientId).as("totals");
+}
 
 export async function GET(request: Request) {
   const session = await getSession();
@@ -14,62 +35,59 @@ export async function GET(request: Request) {
   const clientIdParam = searchParams.get("id");
   const page = Math.max(1, Number.parseInt(searchParams.get("page") || "1", 10) || 1);
   const pageSize = Math.min(100, Math.max(10, Number.parseInt(searchParams.get("pageSize") || "25", 10) || 25));
+  const sortParam = searchParams.get("sort") as Sort;
+  const sort: Sort = SORTS.includes(sortParam) ? sortParam : "recent";
+  const ascending = (searchParams.get("dir") || (sort === "name" ? "asc" : "desc")) === "asc";
+
+  const totals = clientTotals(cairoNowParts().date);
+  const columns = {
+    client: clients,
+    totalBookings: sql<number>`coalesce(${totals.totalBookings}, 0)`.mapWith(Number),
+    totalSpent: sql<number>`coalesce(${totals.totalSpent}, 0)`.mapWith(Number),
+    upcoming: sql<number>`coalesce(${totals.upcoming}, 0)`.mapWith(Number),
+    lastBooking: totals.lastBooking,
+  };
+  type Row = { client: typeof clients.$inferSelect; totalBookings: number; totalSpent: number; upcoming: number; lastBooking: string | null };
+  const flatten = (row: Row) => ({ ...row.client, totalBookings: row.totalBookings, totalSpent: row.totalSpent, upcoming: row.upcoming, lastBooking: row.lastBooking });
 
   // Single client with bookings
   if (clientIdParam !== null) {
     const id = parseId(clientIdParam);
     if (id === null) return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
 
-    const clientRows = await db.select().from(clients).where(eq(clients.id, id)).limit(1);
+    const [clientRows, clientBookings] = await Promise.all([
+      db.select(columns).from(clients).leftJoin(totals, eq(totals.clientId, clients.id)).where(eq(clients.id, id)).limit(1),
+      db.select().from(bookings)
+        .innerJoin(technicians, eq(bookings.technicianId, technicians.id))
+        .where(eq(bookings.clientId, id))
+        .orderBy(desc(bookings.bookingDate)),
+    ]);
     if (clientRows.length === 0) return NextResponse.json({ error: "Not found" }, { status: 404 });
-
-    const clientBookings = await db
-      .select()
-      .from(bookings)
-      .innerJoin(technicians, eq(bookings.technicianId, technicians.id))
-      .where(eq(bookings.clientId, id))
-      .orderBy(desc(bookings.bookingDate));
-
-    return NextResponse.json({ client: clientRows[0], bookings: clientBookings });
+    return NextResponse.json({ client: flatten(clientRows[0]), bookings: clientBookings });
   }
 
-  // List all clients with optional search
-  let clientList;
+  // List clients with optional search, sorted on the server so paging stays correct
   const pattern = `%${search}%`;
   const filter = search
     ? or(ilike(clients.name, pattern), ilike(clients.phone, pattern), ilike(clients.phoneNormalized, `%${normalizePhone(search)}%`))
     : undefined;
-  if (search) {
-    clientList = await db
-      .select()
-      .from(clients)
-      .where(filter)
-      .orderBy(desc(clients.updatedAt))
-      .limit(pageSize)
-      .offset((page - 1) * pageSize);
-  } else {
-    clientList = await db.select().from(clients).orderBy(desc(clients.updatedAt)).limit(pageSize).offset((page - 1) * pageSize);
-  }
-  const totals = await db.select({ total: sql<number>`count(*)::int` }).from(clients).where(filter);
+  const sortColumn = {
+    recent: sql`${clients.updatedAt}`,
+    name: sql`lower(${clients.name})`,
+    bookings: sql`coalesce(${totals.totalBookings}, 0)`,
+    spent: sql`coalesce(${totals.totalSpent}, 0)`,
+    upcoming: sql`coalesce(${totals.upcoming}, 0)`,
+    lastBooking: sql`${totals.lastBooking}`,
+  }[sort];
+  const order = ascending ? sql`${sortColumn} asc nulls last` : sql`${sortColumn} desc nulls last`;
 
-  const ids = clientList.map((client) => client.id);
-  const aggregates = ids.length
-    ? await db.select({
-        clientId: bookings.clientId,
-        totalBookings: sql<number>`count(*)::int`,
-        totalSpent: sql<number>`coalesce(sum(case when ${bookings.status} in ('confirmed', 'completed') and ${bookings.priceIsEstimate} = false then ${bookings.price} else 0 end), 0)::int`,
-        upcoming: sql<number>`count(*) filter (where ${bookings.status} = 'confirmed')::int`,
-      }).from(bookings).where(inArray(bookings.clientId, ids)).groupBy(bookings.clientId)
-    : [];
-  const byClient = new Map(aggregates.map((row) => [row.clientId, row]));
-  const enriched = clientList.map((client) => ({
-    ...client,
-    totalBookings: byClient.get(client.id)?.totalBookings || 0,
-    totalSpent: byClient.get(client.id)?.totalSpent || 0,
-    upcoming: byClient.get(client.id)?.upcoming || 0,
-  }));
+  const [rows, counts] = await Promise.all([
+    db.select(columns).from(clients).leftJoin(totals, eq(totals.clientId, clients.id)).where(filter)
+      .orderBy(order, desc(clients.id)).limit(pageSize).offset((page - 1) * pageSize),
+    db.select({ total: sql<number>`count(*)::int` }).from(clients).where(filter),
+  ]);
 
-  return NextResponse.json({ items: enriched, total: totals[0]?.total || 0, page, pageSize });
+  return NextResponse.json({ items: rows.map(flatten), total: counts[0]?.total || 0, page, pageSize, sort, dir: ascending ? "asc" : "desc" });
 }
 
 export async function PUT(request: Request) {

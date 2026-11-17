@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
-import { technicians } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { blockedDates, bookings, technicianServices, technicians } from "@/db/schema";
+import { and, eq, gte, inArray, isNull, sql } from "drizzle-orm";
+import { cairoNowParts } from "@/lib/cairoTime";
+import { parseId } from "@/lib/validate";
 import { getSession } from "@/lib/auth";
 import { isValidCategory, isValidSlotType, isValidTime } from "@/lib/validate";
 
@@ -9,7 +11,7 @@ export async function GET() {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const results = await db.select().from(technicians);
+  const results = await db.select().from(technicians).where(isNull(technicians.removedAt)).orderBy(technicians.id);
   return NextResponse.json(results);
 }
 
@@ -76,7 +78,9 @@ export async function PUT(request: Request) {
     return NextResponse.json({ error: "No valid fields to update" }, { status: 400 });
   }
 
-  await db.update(technicians).set(safeUpdates).where(eq(technicians.id, id));
+  const changed = await db.update(technicians).set(safeUpdates)
+    .where(and(eq(technicians.id, id), isNull(technicians.removedAt))).returning({ id: technicians.id });
+  if (!changed.length) return NextResponse.json({ error: "Technician not found" }, { status: 404 });
 
   const updated = await db
     .select()
@@ -85,4 +89,42 @@ export async function PUT(request: Request) {
     .limit(1);
 
   return NextResponse.json(updated[0]);
+}
+
+/**
+ * Permanently removes a technician from the dashboard and the booking flow.
+ * Refused while they still have upcoming appointments, which must be
+ * reassigned or cancelled first. Past bookings are kept (client history and
+ * revenue depend on them), so the row is retired rather than deleted.
+ */
+export async function DELETE(request: Request) {
+  if (!(await getSession())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const id = parseId(new URL(request.url).searchParams.get("id"));
+  if (id === null) return NextResponse.json({ error: "Valid technician ID is required" }, { status: 400 });
+
+  const today = cairoNowParts().date;
+  try {
+    const result = await db.transaction(async (tx) => {
+      const rows = await tx.select({ id: technicians.id }).from(technicians)
+        .where(and(eq(technicians.id, id), isNull(technicians.removedAt))).limit(1);
+      if (!rows.length) return { status: 404, error: "Technician not found" };
+
+      const upcoming = await tx.select({ count: sql<number>`count(*)::int` }).from(bookings)
+        .where(and(eq(bookings.technicianId, id), gte(bookings.bookingDate, today), inArray(bookings.status, ["pending_deposit", "confirmed"])));
+      const count = upcoming[0]?.count || 0;
+      if (count > 0) {
+        return { status: 409, error: `This technician still has ${count} upcoming booking${count === 1 ? "" : "s"}. Reassign or cancel ${count === 1 ? "it" : "them"} first.` };
+      }
+
+      await tx.delete(blockedDates).where(eq(blockedDates.technicianId, id));
+      await tx.delete(technicianServices).where(eq(technicianServices.technicianId, id));
+      await tx.update(technicians).set({ active: false, removedAt: new Date() }).where(eq(technicians.id, id));
+      return { status: 200 };
+    });
+    if (result.status !== 200) return NextResponse.json({ error: result.error }, { status: result.status });
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("Technician removal error:", error);
+    return NextResponse.json({ error: "Could not remove technician" }, { status: 500 });
+  }
 }

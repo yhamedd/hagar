@@ -52,7 +52,10 @@ export interface ClientRow {
   totalBookings: number;
   totalSpent: number;
   upcoming: number;
+  lastBooking: string | null;
 }
+
+export type ClientSort = "recent" | "name" | "bookings" | "spent" | "upcoming" | "lastBooking";
 
 export interface BlockedDate {
   id: number;

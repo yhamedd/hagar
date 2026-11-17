@@ -8,7 +8,7 @@ import type { ServiceCatalogItem } from "@/lib/serviceCatalog";
 import {
   Badge, CANCELLED_STATUSES, DAY_LABELS, Pagination, RemindButton, STATUSES, Stat, TABS, TIME_OPTS,
   fmtDate, fmtPrice, inputCls, labelCls,
-  type BlockedDate, type BookingRow, type CalView, type ClientRow, type Tab, type Technician,
+  type BlockedDate, type BookingRow, type CalView, type ClientRow, type ClientSort, type Tab, type Technician,
 } from "@/components/admin/shared";
 import Overview, { type AdminStats } from "@/components/admin/Overview";
 import BookingDrawer from "@/components/admin/BookingDrawer";
@@ -97,6 +97,7 @@ export default function AdminPage() {
   const [fStatus, setFStatus] = useState("all");
   const [fTech, setFTech] = useState(0);
   const [clientQ, setClientQ] = useState("");
+  const [clientSort, setClientSort] = useState<{ by: ClientSort; dir: "asc" | "desc" }>({ by: "recent", dir: "desc" });
   const [bookingQ, setBookingQ] = useState("");
 
   // ── Active states ──
@@ -195,10 +196,10 @@ export default function AdminPage() {
   const loadPortal = useCallback(async () => { const r = await af("/api/admin/technician-portal"); if (r.ok) { const d = await r.json(); if (d) { setPortalUsername(d.username); setPortalActive(d.active); } } }, [af]);
   const loadBlocked = useCallback(async () => { const r = await af("/api/admin/blocked-dates"); if (r.ok) setBlocked(await r.json()); }, [af]);
   const loadClients = useCallback(async () => {
-    const query = new URLSearchParams({ search: clientQ, page: String(clientPage), pageSize: "25" });
+    const query = new URLSearchParams({ search: clientQ, page: String(clientPage), pageSize: "25", sort: clientSort.by, dir: clientSort.dir });
     const r = await af(`/api/admin/clients?${query}`);
     if (r.ok) { const d = await r.json(); setClients(d.items); setClientTotal(d.total); }
-  }, [af, clientQ, clientPage]);
+  }, [af, clientQ, clientPage, clientSort]);
   const loadStats = useCallback(async () => {
     try {
       const r = await af("/api/admin/stats");
@@ -352,6 +353,23 @@ export default function AdminPage() {
     try {
       if (await mutate("/api/admin/technicians", json("PUT", { id: t.id, active: !t.active }), "Could not update technician")) await loadTechs();
     } finally { setTogglingId(null); }
+  };
+
+  const removeTech = async (t: Technician) => {
+    if (!window.confirm(`Remove ${t.name} permanently?\n\nThey disappear from the dashboard and the booking page, and this cannot be undone here. Their past bookings stay in client history.`)) return;
+    setTogglingId(t.id);
+    try {
+      if (await mutate(`/api/admin/technicians?id=${t.id}`, { method: "DELETE" }, "Could not remove technician")) {
+        setActionMessage({ text: `${t.name} removed`, error: false });
+        await loadTechs();
+      }
+    } finally { setTogglingId(null); }
+  };
+
+  // Clicking a column sorts by it; clicking it again flips the direction.
+  const sortClients = (by: ClientSort) => {
+    setClientSort((prev) => (prev.by === by ? { by, dir: prev.dir === "asc" ? "desc" : "asc" } : { by, dir: by === "name" ? "asc" : "desc" }));
+    setClientPage(1);
   };
 
   const savePortal = async () => {
@@ -649,8 +667,26 @@ export default function AdminPage() {
         {/* ═══════════════ CLIENTS LIST ═══════════════ */}
         {tab === "clients" && !selClient && (
           <section>
-            <div className="flex items-center gap-3 mb-4">
+            <div className="flex flex-wrap items-center gap-3 mb-4">
               <h2 className="text-lg font-medium mr-auto">Clients</h2>
+              <label className="sr-only" htmlFor="client-sort">Sort clients</label>
+              <select
+                id="client-sort"
+                value={`${clientSort.by}:${clientSort.dir}`}
+                onChange={(e) => { const [by, dir] = e.target.value.split(":"); setClientSort({ by: by as ClientSort, dir: dir as "asc" | "desc" }); setClientPage(1); }}
+                className="h-8 border border-gray-200 px-2 text-xs bg-white focus:outline-none focus:border-black"
+              >
+                <option value="recent:desc">Recently active</option>
+                <option value="name:asc">Name A–Z</option>
+                <option value="name:desc">Name Z–A</option>
+                <option value="spent:desc">Highest spend</option>
+                <option value="spent:asc">Lowest spend</option>
+                <option value="bookings:desc">Most bookings</option>
+                <option value="bookings:asc">Fewest bookings</option>
+                <option value="upcoming:desc">Most upcoming</option>
+                <option value="lastBooking:desc">Latest booking</option>
+                <option value="lastBooking:asc">Oldest booking</option>
+              </select>
               <input
                 type="text"
                 value={clientQ}
@@ -668,11 +704,15 @@ export default function AdminPage() {
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="bg-gray-50 border-b border-gray-100 text-xs uppercase tracking-wider text-gray-500">
-                        <th className="text-left px-4 py-2.5 font-medium">Name</th>
-                        <th className="text-left px-4 py-2.5 font-medium">Phone</th>
-                        <th className="text-left px-4 py-2.5 font-medium">Bookings</th>
-                        <th className="text-left px-4 py-2.5 font-medium">Spent</th>
-                        <th className="text-left px-4 py-2.5 font-medium">Upcoming</th>
+                        {([["name", "Name"], [null, "Phone"], ["bookings", "Bookings"], ["spent", "Spent"], ["upcoming", "Upcoming"], ["lastBooking", "Last booking"]] as [ClientSort | null, string][]).map(([key, label]) => (
+                          <th key={label} className="text-left px-4 py-2.5 font-medium whitespace-nowrap" aria-sort={key && clientSort.by === key ? (clientSort.dir === "asc" ? "ascending" : "descending") : undefined}>
+                            {key ? (
+                              <button type="button" onClick={() => sortClients(key)} className={`uppercase tracking-wider hover:text-black transition-colors ${clientSort.by === key ? "text-black" : ""}`}>
+                                {label}<span className="inline-block w-3 text-[10px]">{clientSort.by === key ? (clientSort.dir === "asc" ? "↑" : "↓") : ""}</span>
+                              </button>
+                            ) : label}
+                          </th>
+                        ))}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
@@ -683,6 +723,7 @@ export default function AdminPage() {
                           <td className="px-4 py-2.5">{c.totalBookings}</td>
                           <td className="px-4 py-2.5">{c.totalSpent > 0 ? fmtPrice(c.totalSpent) : "—"}</td>
                           <td className="px-4 py-2.5">{c.upcoming > 0 ? <span className="text-green-600 font-medium">{c.upcoming}</span> : "0"}</td>
+                          <td className="px-4 py-2.5 text-gray-500 whitespace-nowrap">{c.lastBooking ? fmtDate(c.lastBooking) : "—"}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -854,6 +895,7 @@ export default function AdminPage() {
                               {togglingId === t.id ? "…" : t.active ? "Deactivate" : "Reactivate"}
                             </button>
                             {techs.length > 0 && <button onClick={() => setEditTech({ ...t })} className="text-xs text-gray-400 hover:text-black transition-colors">Edit</button>}
+                            <button onClick={() => removeTech(t)} disabled={togglingId === t.id} className="text-xs text-gray-400 hover:text-red-600 transition-colors disabled:opacity-50">Remove</button>
                           </div>
                         </div>
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
