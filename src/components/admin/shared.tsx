@@ -125,7 +125,7 @@ export const REMINDABLE_STATUSES = ["pending_deposit", "confirmed"];
  * already written -- the admin just presses send. Clicking also records the
  * reminder so everyone on the dashboard can see it has been done.
  */
-export function RemindButton({ row, techName, onSent }: { row: BookingRow; techName: string; onSent: (id: number) => void }) {
+export function RemindButton({ row, techName, onSent }: { row: BookingRow; techName: string; onSent: (id: number, sent?: boolean) => void }) {
   const b = row.bookings;
   if (!REMINDABLE_STATUSES.includes(b.status) || b.bookingDate < format(new Date(), "yyyy-MM-dd")) return null;
   const href = reminderLink(b, techName);
@@ -144,7 +144,13 @@ export function RemindButton({ row, techName, onSent }: { row: BookingRow; techN
         <WhatsAppIcon className="w-3.5 h-3.5" />
         {sent ? "Remind again" : "Remind"}
       </a>
-      {sent && <span className="text-[10px] text-gray-400 whitespace-nowrap">Reminded {format(sent, "MMM d, h:mm a")}</span>}
+      {sent && (
+        <span className="text-[10px] text-gray-400 whitespace-nowrap">
+          Reminded {format(sent, "MMM d, h:mm a")}
+          {" · "}
+          <button type="button" onClick={() => onSent(b.id, false)} title="Mark as not reminded" className="underline hover:text-black">Undo</button>
+        </span>
+      )}
     </span>
   );
 }

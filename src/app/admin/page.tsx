@@ -312,13 +312,13 @@ export default function AdminPage() {
   // ── Actions ──
   // Fired as the WhatsApp chat opens: record the reminder and reflect it
   // immediately in both the list and the calendar.
-  const markReminded = async (id: number) => {
-    const stamp = (rows: BookingRow[]) => rows.map((r) => (r.bookings.id === id ? { ...r, bookings: { ...r.bookings, reminderSentAt: new Date().toISOString() } } : r));
+  const markReminded = async (id: number, sent = true) => {
+    const stamp = (rows: BookingRow[]) => rows.map((r) => (r.bookings.id === id ? { ...r, bookings: { ...r.bookings, reminderSentAt: sent ? new Date().toISOString() : null } } : r));
     setBookings(stamp);
     setCalItems(stamp);
     setStats((prev) => prev && { ...prev, lists: { today: stamp(prev.lists.today), tomorrow: stamp(prev.lists.tomorrow), pending: stamp(prev.lists.pending) } });
     setDrawer((prev) => (prev ? stamp([prev])[0] : prev));
-    if (await mutate("/api/admin/bookings/reminder", json("POST", { id }), "WhatsApp opened, but the reminder could not be recorded") && tab === "overview") loadStats();
+    if (await mutate("/api/admin/bookings/reminder", json("POST", { id, sent }), sent ? "WhatsApp opened, but the reminder could not be recorded" : "Could not mark the booking as not reminded") && tab === "overview") loadStats();
   };
 
   const changeStatus = async (id: number, status: string) => {

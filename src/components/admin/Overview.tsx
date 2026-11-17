@@ -35,7 +35,7 @@ interface RowActions {
   updatingId: number | null;
   onOpen: (row: BookingRow) => void;
   onStatus: (id: number, status: string) => void;
-  onReminded: (id: number) => void;
+  onReminded: (id: number, sent?: boolean) => void;
 }
 
 function Kpi({ label, value, hint, tone = "default", onClick }: { label: string; value: string | number; hint?: string; tone?: "default" | "amber" | "green"; onClick?: () => void }) {
@@ -53,7 +53,9 @@ function Kpi({ label, value, hint, tone = "default", onClick }: { label: string;
     : <div className={cls}>{body}</div>;
 }
 
-const quickBtn = "h-7 px-2.5 text-[11px] font-medium border whitespace-nowrap transition-colors disabled:opacity-40";
+const quickBtn = "flex-1 sm:flex-none h-9 sm:h-7 px-2.5 text-xs sm:text-[11px] font-medium border whitespace-nowrap transition-colors disabled:opacity-40";
+// Status actions sit on their own full-width row on phones, sharing it equally.
+const quickGroup = "flex gap-2 basis-full sm:basis-auto";
 
 /** How long a pending booking still has before its deposit hold auto-cancels. */
 function holdLeft(createdAt: string, holdMs: number, now: number): { label: string; urgent: boolean } {
@@ -84,16 +86,16 @@ function BookingLine({ row, showDate, hold, actions }: { row: BookingRow; showDa
         <Badge status={b.status} />
         <RemindButton row={row} techName={row.technicians.name} onSent={actions.onReminded} />
         {b.status === "pending_deposit" && (
-          <>
+          <div className={quickGroup}>
             <button type="button" disabled={busy} onClick={() => actions.onStatus(b.id, "confirmed")} className={`${quickBtn} bg-black text-white border-black hover:bg-gray-800`}>Deposit received</button>
             <button type="button" disabled={busy} onClick={() => { if (window.confirm(`Cancel ${b.clientName}'s booking?`)) actions.onStatus(b.id, "cancelled"); }} className={`${quickBtn} border-gray-200 text-gray-500 hover:border-red-300 hover:text-red-600`}>Cancel</button>
-          </>
+          </div>
         )}
         {b.status === "confirmed" && !showDate && (
-          <>
+          <div className={quickGroup}>
             <button type="button" disabled={busy} onClick={() => actions.onStatus(b.id, "completed")} className={`${quickBtn} border-gray-200 hover:border-black`}>Completed</button>
             <button type="button" disabled={busy} onClick={() => actions.onStatus(b.id, "no_show")} className={`${quickBtn} border-gray-200 text-gray-500 hover:border-red-300 hover:text-red-600`}>No-show</button>
-          </>
+          </div>
         )}
       </div>
     </li>

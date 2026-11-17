@@ -45,6 +45,8 @@ describe("reminder message", () => {
     expect(message).toContain("Classic Lashes + Lash Lift with Nada");
     expect(message).toContain("Agora Mall, New Cairo");
     expect(message).not.toContain("deposit");
+    // Plain ASCII only: emoji arrive as "\uFFFD" on some phones when sent through wa.me links.
+    expect(message).toMatch(/^[\x20-\x7E\n]+$/);
   });
 
   it("asks for the deposit while the booking is still pending", () => {

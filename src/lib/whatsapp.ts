@@ -52,12 +52,12 @@ export function buildReminderMessage(booking: ReminderBooking, technicianName: s
   const firstName = booking.clientName.trim().split(/\s+/)[0] || "there";
   const services = [booking.service, ...(booking.extras || [])].filter(Boolean).join(" + ");
   const lines = [
-    `Hi ${firstName} \u{1F90D}`,
+    `Hi ${firstName},`,
     `This is a friendly reminder of your appointment at ${SITE.name}:`,
     "",
-    `\u{1F4C5} ${formatReminderDate(booking.bookingDate)} at ${formatTime12h(booking.bookingTime)}`,
-    `✨ ${services} with ${technicianName}`,
-    `\u{1F4CD} ${SITE.location}: ${SITE.mapsUrl}`,
+    `Date: ${formatReminderDate(booking.bookingDate)} at ${formatTime12h(booking.bookingTime)}`,
+    `Service: ${services} with ${technicianName}`,
+    `Location: ${SITE.location} - ${SITE.mapsUrl}`,
     "",
   ];
   if (booking.status === "pending_deposit") {

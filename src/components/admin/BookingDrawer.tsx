@@ -14,7 +14,7 @@ interface Props {
   af: (url: string, opts?: RequestInit) => Promise<Response>;
   onClose: () => void;
   onSaved: () => void;
-  onReminded: (id: number) => void;
+  onReminded: (id: number, sent?: boolean) => void;
   onOpenClient: (clientId: number) => void;
 }
 
