@@ -86,6 +86,12 @@ never touch the production database. The runtime refuses to start unless
 `DATABASE_ENVIRONMENT` matches the resolved environment (`production` on Vercel,
 since `REPLIT_DEPLOYMENT` is unset and `NODE_ENV=production`).
 
+## Admin dashboard
+
+`/admin` opens on an **Overview** that answers "what needs doing now": bookings awaiting a deposit (with the time left on their hold and one-click *Deposit received* / *Cancel*), today's and tomorrow's appointments (with *Completed* / *No-show* and WhatsApp reminders), and headline numbers for the day and month. It refreshes itself every minute while open and is served by a single request to `/api/admin/stats`.
+
+Clicking a booking (or **Edit** in the Bookings and Calendar tabs) opens a side panel to change its status, reschedule it, reassign the technician, set the final price, or add internal notes. Each tab loads its own data only when opened. The admin UI lives in `src/app/admin/page.tsx` with shared pieces in `src/components/admin/`.
+
 ## WhatsApp booking reminders
 
 In the admin dashboard, every upcoming booking that is pending or confirmed has a green **Remind** button (Bookings tab and Calendar tab). Clicking it opens WhatsApp on a chat with the client with the reminder already written (date, time, service, technician, location, and a deposit prompt when the booking is still pending) - press send in WhatsApp to deliver it. The message goes out from whichever WhatsApp account is signed in on that device, so no WhatsApp Business API account or credentials are needed.

@@ -73,6 +73,15 @@ export async function PUT(request: Request) {
     const nextTime = body.bookingTime?.slice(0, 5) ?? current.bookingTime.slice(0, 5);
     const nextStatus = body.status ?? current.status;
     const nextTechnicianId: number = body.technicianId ?? current.technicianId;
+    // Editing notes or the price must not be rejected just because the day
+    // was blocked or the technician's hours changed after the booking was made;
+    // the schedule is only re-checked when the occupied slot itself changes.
+    const slotChanged =
+      nextDate !== current.bookingDate ||
+      nextTime !== current.bookingTime.slice(0, 5) ||
+      nextTechnicianId !== current.technicianId ||
+      nextStatus !== current.status ||
+      (typeof body.duration === "number" && body.duration !== current.duration);
     const safeUpdates: Record<string, unknown> = { updatedAt: new Date() };
     if (body.status !== undefined) safeUpdates.status = body.status;
     if (body.technicianId !== undefined) safeUpdates.technicianId = nextTechnicianId;
@@ -89,7 +98,7 @@ export async function PUT(request: Request) {
 
     await db.transaction(async (tx) => {
       await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`${nextTechnicianId}:${nextDate}`}))`);
-      if (nextStatus === "confirmed" || nextStatus === "pending_deposit") {
+      if (slotChanged && (nextStatus === "confirmed" || nextStatus === "pending_deposit")) {
         const techRows = await tx.select().from(technicians).where(and(eq(technicians.id, nextTechnicianId), eq(technicians.active, true))).limit(1);
         const tech = techRows[0];
         const weekday = new Date(`${nextDate}T00:00:00Z`).getUTCDay();
@@ -102,7 +111,7 @@ export async function PUT(request: Request) {
           // category and any per-technician service restriction.
           const serviceRows = await tx.select().from(services).where(eq(services.name, current.service)).limit(1);
           const serviceRow = serviceRows[0];
-          const allowedServiceIds = await getAllowedServiceIds(nextTechnicianId);
+          const allowedServiceIds = await getAllowedServiceIds(nextTechnicianId, tx);
           if (!serviceRow || serviceRow.category !== tech.category || (allowedServiceIds && !allowedServiceIds.has(serviceRow.id))) {
             throw new AdminBookingError("This service isn't available for the selected technician", 400);
           }
@@ -150,7 +159,7 @@ export async function POST(request: Request) {
       const techRows = await tx.select().from(technicians).where(and(eq(technicians.id, technicianId), eq(technicians.active, true))).limit(1);
       const tech = techRows[0];
       if (!tech) throw new AdminBookingError("Technician not found", 404);
-      const allowedServiceIds = await getAllowedServiceIds(technicianId);
+      const allowedServiceIds = await getAllowedServiceIds(technicianId, tx);
       const selectedServiceRows = await tx.select().from(services).where(and(eq(services.name, service), eq(services.active, true))).limit(1);
       const selectedService = selectedServiceRows[0];
       const selectedExtras = extras.length ? await tx.select().from(services).where(and(inArray(services.name, extras), eq(services.active, true), inArray(services.category, ["extras", tech.category]))) : [];

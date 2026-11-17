@@ -87,7 +87,7 @@ export async function POST(request: Request) {
       const technician = techRows[0];
       if (!technician) throw new BookingError("Technician not found", 404);
 
-      const allowedServiceIds = await getAllowedServiceIds(technicianId);
+      const allowedServiceIds = await getAllowedServiceIds(technicianId, tx);
 
       const selectedServiceRows = await tx.select().from(services).where(and(eq(services.name, service), eq(services.active, true))).limit(1);
       const selectedService = selectedServiceRows[0];

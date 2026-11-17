@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { blockedDates, technicians } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { and, asc, eq, gte } from "drizzle-orm";
+import { cairoNowParts } from "@/lib/cairoTime";
 import { getSession } from "@/lib/auth";
 import { parseId, isValidDate, sanitizeText } from "@/lib/validate";
 
@@ -12,15 +13,13 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const technicianId = parseId(searchParams.get("technicianId"));
 
-  let results;
-  if (technicianId) {
-    results = await db
-      .select()
-      .from(blockedDates)
-      .where(eq(blockedDates.technicianId, technicianId));
-  } else {
-    results = await db.select().from(blockedDates);
-  }
+  // Past closures no longer affect anything, so only today onward is listed.
+  const upcoming = gte(blockedDates.blockedDate, cairoNowParts().date);
+  const results = await db
+    .select()
+    .from(blockedDates)
+    .where(technicianId ? and(upcoming, eq(blockedDates.technicianId, technicianId)) : upcoming)
+    .orderBy(asc(blockedDates.blockedDate), asc(blockedDates.technicianId));
 
   return NextResponse.json(results);
 }

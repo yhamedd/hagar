@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { technicians } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
+import { PUBLIC_CATALOG_CACHE } from "@/lib/httpCache";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -14,11 +15,8 @@ export async function GET(request: Request) {
       category: technicians.category,
     })
     .from(technicians)
-    .where(eq(technicians.active, true));
+    .where(category ? and(eq(technicians.active, true), eq(technicians.category, category)) : eq(technicians.active, true))
+    .orderBy(asc(technicians.id));
 
-  const filtered = category
-    ? results.filter((t) => t.category === category)
-    : results;
-
-  return NextResponse.json(filtered);
+  return NextResponse.json(results, { headers: PUBLIC_CATALOG_CACHE });
 }

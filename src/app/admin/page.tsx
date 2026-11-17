@@ -5,183 +5,13 @@ import { addDays, addMonths, addWeeks, endOfMonth, endOfWeek, format, startOfMon
 import { formatTime12h } from "@/lib/timeFormat";
 import { generateTimeSlots } from "@/lib/slots";
 import type { ServiceCatalogItem } from "@/lib/serviceCatalog";
-import { reminderLink } from "@/lib/whatsapp";
-import { WhatsAppIcon } from "@/components/PaymentContact";
-
-// ────────────────────────────────────────────────────────
-// Types
-// ────────────────────────────────────────────────────────
-interface Technician {
-  id: number;
-  name: string;
-  category: string;
-  slotType: string;
-  availableDays: number[];
-  startTime: string | null;
-  endTime: string | null;
-  slotInterval: number | null;
-  fixedSlots: string[] | null;
-  active: boolean;
-}
-
-interface BookingRow {
-  bookings: {
-    id: number;
-    clientId: number | null;
-    technicianId: number;
-    clientName: string;
-    clientPhone: string;
-    service: string;
-    extras: string[];
-    price: number | null;
-    priceIsEstimate: boolean;
-    bookingDate: string;
-    bookingTime: string;
-    duration: number | null;
-    status: string;
-    notes: string | null;
-    adminNotes: string | null;
-    reminderSentAt: string | null;
-    createdAt: string;
-  };
-  technicians: { id: number; name: string; category: string };
-}
-
-interface ClientRow {
-  id: number;
-  name: string;
-  phone: string;
-  phoneNormalized: string;
-  notes: string | null;
-  totalBookings: number;
-  totalSpent: number;
-  upcoming: number;
-}
-
-interface BlockedDate {
-  id: number;
-  technicianId: number;
-  blockedDate: string;
-  reason: string | null;
-}
-
-// ────────────────────────────────────────────────────────
-// Constants & Helpers
-// ────────────────────────────────────────────────────────
-const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-
-type Tab = "bookings" | "calendar" | "clients" | "technicians" | "blocked" | "manual";
-
-const TABS: { key: Tab; label: string }[] = [
-  { key: "bookings", label: "Bookings" },
-  { key: "calendar", label: "Calendar" },
-  { key: "clients", label: "Clients" },
-  { key: "technicians", label: "Technicians" },
-  { key: "blocked", label: "Schedule" },
-  { key: "manual", label: "New Booking" },
-];
-
-type CalView = "day" | "week" | "month";
-const CANCELLED_STATUSES = ["cancelled", "rescheduled"];
-
-const STATUSES = [
-  { value: "pending_deposit", label: "Pending", bg: "bg-amber-50 text-amber-700" },
-  { value: "confirmed", label: "Confirmed", bg: "bg-green-50 text-green-700" },
-  { value: "completed", label: "Completed", bg: "bg-blue-50 text-blue-700" },
-  { value: "cancelled", label: "Cancelled", bg: "bg-gray-100 text-gray-500" },
-  { value: "no_show", label: "No-Show", bg: "bg-red-50 text-red-600" },
-  { value: "rescheduled", label: "Rescheduled", bg: "bg-purple-50 text-purple-600" },
-];
-
-function sBg(s: string) { return STATUSES.find((x) => x.value === s)?.bg ?? "bg-gray-100 text-gray-500"; }
-function sLbl(s: string) { return STATUSES.find((x) => x.value === s)?.label ?? s; }
-
-function fmtDate(d: string) {
-  if (!d) return "—";
-  try { return new Date(d + "T00:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }); }
-  catch { return d; }
-}
-
-function fmtPrice(p: number | null) { return p ? p.toLocaleString() + " EGP" : "—"; }
-
-const TIME_OPTS = (() => {
-  const r: { l: string; v: string }[] = [];
-  for (let h = 0; h < 24; h++) for (const m of [0, 30]) {
-    const v = `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
-    r.push({ l: `${h % 12 || 12}:${String(m).padStart(2, "0")} ${h >= 12 ? "PM" : "AM"}`, v });
-  }
-  return r;
-})();
-
-// Shared input / select / label class tokens
-const inputCls = "w-full h-9 border border-gray-200 px-3 text-sm focus:outline-none focus:border-black transition-colors";
-const labelCls = "block text-xs text-gray-500 uppercase tracking-wider font-medium mb-1.5";
-
-// ────────────────────────────────────────────────────────
-// Badge
-// ────────────────────────────────────────────────────────
-// Only upcoming appointments that are still going ahead can be reminded.
-const REMINDABLE_STATUSES = ["pending_deposit", "confirmed"];
-
-/**
- * Opens WhatsApp (app or web) on a chat with the client, with the reminder
- * already written -- the admin just presses send. Clicking also records the
- * reminder so everyone on the dashboard can see it has been done.
- */
-function RemindButton({ row, techName, onSent }: { row: BookingRow; techName: string; onSent: (id: number) => void }) {
-  const b = row.bookings;
-  if (!REMINDABLE_STATUSES.includes(b.status) || b.bookingDate < format(new Date(), "yyyy-MM-dd")) return null;
-  const href = reminderLink(b, techName);
-  if (!href) return <span className="text-[10px] text-gray-400" title="This phone number can't be used on WhatsApp">No WhatsApp no.</span>;
-  const sent = b.reminderSentAt ? new Date(b.reminderSentAt) : null;
-  return (
-    <span className="inline-flex flex-col items-start gap-0.5">
-      <a
-        href={href}
-        target="_blank"
-        rel="noopener noreferrer"
-        onClick={() => onSent(b.id)}
-        title={`Send ${b.clientName} a WhatsApp reminder`}
-        className={`inline-flex items-center gap-1.5 h-7 px-2.5 text-[11px] font-medium whitespace-nowrap transition-colors ${sent ? "border border-[#25D366] text-[#128C4B] hover:bg-green-50" : "bg-[#25D366] text-white hover:bg-[#1ebe5d]"}`}
-      >
-        <WhatsAppIcon className="w-3.5 h-3.5" />
-        {sent ? "Remind again" : "Remind"}
-      </a>
-      {sent && <span className="text-[10px] text-gray-400 whitespace-nowrap">Reminded {format(sent, "MMM d, h:mm a")}</span>}
-    </span>
-  );
-}
-
-function Badge({ status }: { status: string }) {
-  return <span className={`inline-block px-2 py-0.5 text-xs font-medium whitespace-nowrap ${sBg(status)}`}>{sLbl(status)}</span>;
-}
-
-// ────────────────────────────────────────────────────────
-// Stat Box
-// ────────────────────────────────────────────────────────
-function Stat({ value, label, color = "" }: { value: string | number; label: string; color?: string }) {
-  return (
-    <div className={`px-3 py-2.5 text-center ${color || "bg-gray-50"}`}>
-      <p className={`text-lg font-semibold ${color.includes("green") ? "text-green-700" : color.includes("blue") ? "text-blue-700" : color.includes("purple") ? "text-purple-700" : ""}`}>{value}</p>
-      <p className="text-[10px] text-gray-400 uppercase tracking-wider mt-0.5">{label}</p>
-    </div>
-  );
-}
-
-function Pagination({ page, total, pageSize, onPage }: { page: number; total: number; pageSize: number; onPage: (page: number) => void }) {
-  const pages = Math.max(1, Math.ceil(total / pageSize));
-  if (total <= pageSize) return null;
-  return (
-    <div className="flex items-center justify-between border-t border-gray-100 px-4 py-3 text-xs text-gray-500">
-      <span>{total.toLocaleString()} records</span>
-      <div className="flex items-center gap-2">
-        <button type="button" disabled={page <= 1} onClick={() => onPage(page - 1)} className="border border-gray-200 px-3 py-1.5 disabled:opacity-40">Previous</button>
-        <span>Page {page} of {pages}</span>
-        <button type="button" disabled={page >= pages} onClick={() => onPage(page + 1)} className="border border-gray-200 px-3 py-1.5 disabled:opacity-40">Next</button>
-      </div>
-    </div>
-  );
-}
+import {
+  Badge, CANCELLED_STATUSES, DAY_LABELS, Pagination, RemindButton, STATUSES, Stat, TABS, TIME_OPTS,
+  fmtDate, fmtPrice, inputCls, labelCls,
+  type BlockedDate, type BookingRow, type CalView, type ClientRow, type Tab, type Technician,
+} from "@/components/admin/shared";
+import Overview, { type AdminStats } from "@/components/admin/Overview";
+import BookingDrawer from "@/components/admin/BookingDrawer";
 
 // ────────────────────────────────────────────────────────
 // Login Form
@@ -245,7 +75,7 @@ function LoginForm({ onSuccess }: { onSuccess: () => void }) {
 // ────────────────────────────────────────────────────────
 export default function AdminPage() {
   const [auth, setAuth] = useState<"loading" | "login" | "ok">("loading");
-  const [tab, setTab] = useState<Tab>("bookings");
+  const [tab, setTab] = useState<Tab>("overview");
 
   // ── Data ──
   const [bookings, setBookings] = useState<BookingRow[]>([]);
@@ -258,6 +88,10 @@ export default function AdminPage() {
   const [clientPage, setClientPage] = useState(1);
   const [blocked, setBlocked] = useState<BlockedDate[]>([]);
   const [serviceCatalog, setServiceCatalog] = useState<ServiceCatalogItem[]>([]);
+  const [stats, setStats] = useState<AdminStats | null>(null);
+  const [statsError, setStatsError] = useState(false);
+  const [drawer, setDrawer] = useState<BookingRow | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
   // ── Filters ──
   const [fStatus, setFStatus] = useState("all");
@@ -365,6 +199,17 @@ export default function AdminPage() {
     const r = await af(`/api/admin/clients?${query}`);
     if (r.ok) { const d = await r.json(); setClients(d.items); setClientTotal(d.total); }
   }, [af, clientQ, clientPage]);
+  const loadStats = useCallback(async () => {
+    try {
+      const r = await af("/api/admin/stats");
+      if (!r.ok) throw new Error();
+      const d = await r.json();
+      setStats({ ...d, loadedAt: Date.now() });
+      setStatsError(false);
+    } catch {
+      setStatsError(true);
+    }
+  }, [af]);
   const loadCalendar = useCallback(async () => {
     setCalLoading(true);
     setCalError("");
@@ -396,14 +241,28 @@ export default function AdminPage() {
   useEffect(() => {
     // Authenticated data loading is the external synchronization for this effect.
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (auth === "ok") { loadTechs(); loadBlocked(); loadPortal(); }
-  }, [auth, loadTechs, loadBlocked, loadPortal]);
+    if (auth === "ok") loadTechs();
+  }, [auth, loadTechs]);
 
+  // Each tab fetches only what it shows, when it is opened, instead of
+  // loading every dataset up front on sign-in.
   useEffect(() => {
     if (auth !== "ok") return;
+    const timer = window.setTimeout(() => {
+      if (tab === "overview" || tab === "technicians") loadStats();
+      if (tab === "technicians") loadPortal();
+      if (tab === "blocked") loadBlocked();
+    }, 0);
+    // Keep the overview current while it is left open on the front desk.
+    const interval = tab === "overview" ? window.setInterval(() => { if (!document.hidden) loadStats(); }, 60_000) : 0;
+    return () => { window.clearTimeout(timer); window.clearInterval(interval); };
+  }, [auth, tab, loadStats, loadPortal, loadBlocked]);
+
+  useEffect(() => {
+    if (auth !== "ok" || tab !== "bookings") return;
     const timer = window.setTimeout(() => loadBookings(), 250);
     return () => window.clearTimeout(timer);
-  }, [auth, loadBookings]);
+  }, [auth, tab, loadBookings]);
 
   useEffect(() => {
     if (auth !== "ok" || tab !== "calendar") return;
@@ -412,10 +271,43 @@ export default function AdminPage() {
   }, [auth, tab, loadCalendar]);
 
   useEffect(() => {
-    if (auth !== "ok") return;
+    if (auth !== "ok" || tab !== "clients") return;
     const timer = window.setTimeout(() => loadClients(), 250);
     return () => window.clearTimeout(timer);
-  }, [auth, clientQ, clientPage, loadClients]);
+  }, [auth, tab, loadClients]);
+
+  // Toasts clear themselves; errors linger a little longer.
+  useEffect(() => {
+    if (!actionMessage) return;
+    const timer = window.setTimeout(() => setActionMessage(null), actionMessage.error ? 6000 : 3500);
+    return () => window.clearTimeout(timer);
+  }, [actionMessage]);
+
+  /** Reload whatever the current tab is showing. */
+  const refresh = useCallback(async () => {
+    await Promise.all([
+      loadTechs(),
+      tab === "overview" || tab === "technicians" ? loadStats() : null,
+      tab === "bookings" ? loadBookings() : null,
+      tab === "calendar" ? loadCalendar() : null,
+      tab === "clients" ? loadClients() : null,
+      tab === "blocked" ? loadBlocked() : null,
+    ]);
+  }, [tab, loadTechs, loadStats, loadBookings, loadCalendar, loadClients, loadBlocked]);
+
+  /** Run a write request; on failure show the server's reason instead of failing silently. */
+  const mutate = useCallback(async (url: string, opts: RequestInit, fallback: string) => {
+    try {
+      const r = await af(url, opts);
+      if (r.ok) return true;
+      const d = await r.json().catch(() => ({}));
+      setActionMessage({ text: d.error || fallback, error: true });
+    } catch {
+      setActionMessage({ text: fallback, error: true });
+    }
+    return false;
+  }, [af]);
+  const json = (method: string, body: unknown): RequestInit => ({ method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
 
   // ── Actions ──
   // Fired as the WhatsApp chat opens: record the reminder and reflect it
@@ -424,12 +316,9 @@ export default function AdminPage() {
     const stamp = (rows: BookingRow[]) => rows.map((r) => (r.bookings.id === id ? { ...r, bookings: { ...r.bookings, reminderSentAt: new Date().toISOString() } } : r));
     setBookings(stamp);
     setCalItems(stamp);
-    try {
-      const r = await af("/api/admin/bookings/reminder", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) });
-      if (!r.ok) setActionMessage({ text: "WhatsApp opened, but the reminder could not be recorded", error: true });
-    } catch {
-      setActionMessage({ text: "WhatsApp opened, but the reminder could not be recorded", error: true });
-    }
+    setStats((prev) => prev && { ...prev, lists: { today: stamp(prev.lists.today), tomorrow: stamp(prev.lists.tomorrow), pending: stamp(prev.lists.pending) } });
+    setDrawer((prev) => (prev ? stamp([prev])[0] : prev));
+    if (await mutate("/api/admin/bookings/reminder", json("POST", { id }), "WhatsApp opened, but the reminder could not be recorded") && tab === "overview") loadStats();
   };
 
   const changeStatus = async (id: number, status: string) => {
@@ -440,7 +329,7 @@ export default function AdminPage() {
       const d = await r.json().catch(() => ({}));
       if (!r.ok) { setActionMessage({ text: d.error || "Could not update booking", error: true }); return; }
       setActionMessage({ text: "Booking status updated", error: false });
-      await Promise.all([loadBookings(), tab === "calendar" ? loadCalendar() : Promise.resolve()]);
+      await refresh();
     } finally { setUpdatingId(null); }
   };
 
@@ -455,14 +344,13 @@ export default function AdminPage() {
 
   const saveTech = async () => {
     if (!editTech) return; setSavingTech(true);
-    try { await af("/api/admin/technicians", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(editTech) }); setEditTech(null); await loadTechs(); } finally { setSavingTech(false); }
+    try { if (await mutate("/api/admin/technicians", json("PUT", editTech), "Could not save technician")) { setEditTech(null); setActionMessage({ text: "Technician saved", error: false }); await loadTechs(); } } finally { setSavingTech(false); }
   };
 
   const toggleTechActive = async (t: Technician) => {
     setTogglingId(t.id);
     try {
-      await af("/api/admin/technicians", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: t.id, active: !t.active }) });
-      await loadTechs();
+      if (await mutate("/api/admin/technicians", json("PUT", { id: t.id, active: !t.active }), "Could not update technician")) await loadTechs();
     } finally { setTogglingId(null); }
   };
 
@@ -478,15 +366,19 @@ export default function AdminPage() {
 
   const addBlock = async () => {
     if (!bTech || !bDate) return; setBBusy(true);
-    try { await af("/api/admin/blocked-dates", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ technicianId: bTech, blockedDate: bDate, reason: bReason || null }) }); setBDate(""); setBReason(""); await loadBlocked(); } finally { setBBusy(false); }
+    try { if (await mutate("/api/admin/blocked-dates", json("POST", { technicianId: bTech, blockedDate: bDate, reason: bReason || null }), "Could not block that date")) { setBDate(""); setBReason(""); setActionMessage({ text: "Date blocked", error: false }); await loadBlocked(); } } finally { setBBusy(false); }
   };
 
   const closeStore = async () => {
     if (!cDate) return; setCBusy(true);
-    try { await Promise.all(allT.map((t) => af("/api/admin/blocked-dates", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ technicianId: t.id, blockedDate: cDate, reason: cReason.trim() || "Store closed" }) }))); setCDate(""); setCReason(""); await loadBlocked(); } finally { setCBusy(false); }
+    try {
+      const results = await Promise.all(allT.map((t) => mutate("/api/admin/blocked-dates", json("POST", { technicianId: t.id, blockedDate: cDate, reason: cReason.trim() || "Store closed" }), "Could not close the store for that date")));
+      if (results.every(Boolean)) { setCDate(""); setCReason(""); setActionMessage({ text: "Store closed for that date", error: false }); }
+      await loadBlocked();
+    } finally { setCBusy(false); }
   };
 
-  const removeBlock = async (id: number) => { await af(`/api/admin/blocked-dates?id=${id}`, { method: "DELETE" }); loadBlocked(); };
+  const removeBlock = async (id: number) => { if (await mutate(`/api/admin/blocked-dates?id=${id}`, { method: "DELETE" }, "Could not remove that block")) loadBlocked(); };
 
   const createBooking = async () => {
     if (!mTech || !mName || !mPhone || !mSvc || !mDate || !mTime) { setMMsg("Fill all required fields"); return; }
@@ -505,7 +397,8 @@ export default function AdminPage() {
 
   const saveNotes = async () => {
     if (!selClient) return;
-    await af("/api/admin/clients", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: selClient.client.id, notes: clientNotes }) });
+    if (!(await mutate("/api/admin/clients", json("PUT", { id: selClient.client.id, notes: clientNotes }), "Could not save notes"))) return;
+    setActionMessage({ text: "Notes saved", error: false });
     openClient(selClient.client.id);
   };
 
@@ -519,7 +412,11 @@ export default function AdminPage() {
       <header className="sticky top-0 z-50 bg-white border-b border-gray-200">
         <div className="max-w-6xl mx-auto px-5 sm:px-6 h-14 flex items-center justify-between">
           <h1 className="text-sm font-semibold tracking-tight sm:text-base">Hagar Lashes & Nails</h1>
-          <button onClick={async () => { await af("/api/admin/logout", { method: "POST" }); setAuth("login"); }} className="text-sm text-gray-400 hover:text-black transition-colors">Sign out</button>
+          <div className="flex items-center gap-4 text-sm text-gray-400">
+            <button type="button" disabled={refreshing} onClick={async () => { setRefreshing(true); try { await refresh(); } finally { setRefreshing(false); } }} className="hover:text-black disabled:opacity-50 transition-colors">{refreshing ? "Refreshing…" : "Refresh"}</button>
+            <a href="/" target="_blank" rel="noopener noreferrer" className="hidden sm:inline hover:text-black transition-colors">View site</a>
+            <button type="button" onClick={async () => { await af("/api/admin/logout", { method: "POST" }); setAuth("login"); }} className="hover:text-black transition-colors">Sign out</button>
+          </div>
         </div>
       </header>
 
@@ -542,7 +439,19 @@ export default function AdminPage() {
 
       {/* ── Content ── */}
       <div className="max-w-6xl mx-auto px-5 sm:px-6 py-5">
-        {actionMessage && <div role="status" className={`mb-4 border px-4 py-3 text-sm ${actionMessage.error ? "border-red-100 bg-red-50 text-red-700" : "border-green-100 bg-green-50 text-green-700"}`}>{actionMessage.text}</div>}
+        {tab === "overview" && (
+          <Overview
+            stats={stats}
+            error={statsError}
+            onRetry={loadStats}
+            updatingId={updatingId}
+            onOpen={setDrawer}
+            onStatus={changeStatus}
+            onReminded={markReminded}
+            onShowPending={() => { setFStatus("pending_deposit"); setFTech(0); setBookingQ(""); setBookingPage(1); setTab("bookings"); }}
+            onShowCalendar={() => { setCalView("day"); setCalCursor(new Date()); setTab("calendar"); }}
+          />
+        )}
 
         {/* ═══════════════ BOOKINGS ═══════════════ */}
         {tab === "bookings" && (
@@ -578,6 +487,7 @@ export default function AdminPage() {
                         <th className="text-left px-4 py-2.5 font-medium">Status</th>
                         <th className="text-left px-4 py-2.5 font-medium">Reminder</th>
                         <th className="text-left px-4 py-2.5 font-medium w-28"></th>
+                        <th className="px-4 py-2.5 w-12"></th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
@@ -606,6 +516,7 @@ export default function AdminPage() {
                               </select>
                             )}
                           </td>
+                          <td className="px-4 py-2.5 text-right"><button type="button" onClick={() => setDrawer(r)} className="text-[11px] text-gray-500 underline underline-offset-2 hover:text-black">Edit</button></td>
                         </tr>
                       ))}
                     </tbody>
@@ -723,6 +634,7 @@ export default function AdminPage() {
                                 {STATUSES.filter((s) => s.value !== r.bookings.status).map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
                               </select>
                             )}
+                            <button type="button" onClick={() => setDrawer(r)} className="text-[11px] text-gray-500 underline underline-offset-2 hover:text-black">Edit</button>
                           </div>
                         </article>
                       ))}
@@ -872,12 +784,12 @@ export default function AdminPage() {
             </div>
             <div className="grid gap-3">
               {techs.map((t) => {
-                const tb = bookings.filter((b) => b.bookings.technicianId === t.id);
-                const done = tb.filter((b) => b.bookings.status === "completed").length;
-                const today = new Date().toISOString().split("T")[0];
-                const up = tb.filter((b) => b.bookings.status === "confirmed" && b.bookings.bookingDate >= today).length;
-                const rev = tb.filter((b) => b.bookings.status === "confirmed" || b.bookings.status === "completed").reduce((s, b) => s + (b.bookings.price || 0), 0);
-                const uc = new Set(tb.map((b) => b.bookings.clientPhone)).size;
+                // All-time totals from the server (not the current page of the bookings list).
+                const ts = stats?.technicians.find((x) => x.technicianId === t.id);
+                const done = ts?.completed ?? 0;
+                const up = ts?.upcoming ?? 0;
+                const rev = ts?.revenue ?? 0;
+                const uc = ts?.clients ?? 0;
 
                 return (
                   <div key={t.id} className="bg-white border border-gray-200 p-4">
@@ -1069,6 +981,25 @@ export default function AdminPage() {
           </section>
         )}
       </div>
+
+      {drawer && (
+        <BookingDrawer
+          key={drawer.bookings.id}
+          row={drawer}
+          techs={techs}
+          af={af}
+          onClose={() => setDrawer(null)}
+          onSaved={() => { setDrawer(null); setActionMessage({ text: "Booking updated", error: false }); refresh(); }}
+          onReminded={markReminded}
+          onOpenClient={(id) => { setDrawer(null); openClient(id); }}
+        />
+      )}
+
+      {actionMessage && (
+        <div role="status" className={`toast-in fixed bottom-5 left-1/2 z-[70] max-w-[calc(100vw-2rem)] px-4 py-2.5 text-sm shadow-lg ${actionMessage.error ? "bg-red-600 text-white" : "bg-black text-white"}`}>
+          {actionMessage.text}
+        </div>
+      )}
     </div>
   );
 }
