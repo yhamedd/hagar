@@ -1,7 +1,7 @@
 "use client";
 
 import { formatTime12h } from "@/lib/timeFormat";
-import { Badge, RemindButton, fmtDate, fmtPrice, type BookingRow } from "./shared";
+import { Badge, RemindButton, ReminderStamp, fmtDate, fmtPrice, type BookingRow } from "./shared";
 
 export interface TechnicianStats {
   technicianId: number;
@@ -53,7 +53,7 @@ function Kpi({ label, value, hint, tone = "default", onClick }: { label: string;
     : <div className={cls}>{body}</div>;
 }
 
-const quickBtn = "flex-1 sm:flex-none h-9 sm:h-7 px-2.5 text-xs sm:text-[11px] font-medium border whitespace-nowrap transition-colors disabled:opacity-40";
+const quickBtn = "flex-1 sm:flex-none h-9 sm:h-7 px-2.5 text-xs sm:text-[11px] font-medium border whitespace-nowrap transition-colors disabled:opacity-60 disabled:cursor-wait";
 // Status actions sit on their own full-width row on phones, sharing it equally.
 const quickGroup = "flex gap-2 basis-full sm:basis-auto";
 
@@ -75,19 +75,22 @@ function BookingLine({ row, showDate, hold, actions }: { row: BookingRow; showDa
         <p className="text-sm font-semibold tabular-nums">{formatTime12h(b.bookingTime)}</p>
         {showDate && <p className="text-[11px] text-gray-400">{fmtDate(b.bookingDate)}</p>}
       </div>
-      <button type="button" onClick={() => actions.onOpen(row)} className="min-w-0 flex-1 basis-40 text-left group">
-        <span className="text-sm font-medium group-hover:underline">{b.clientName}</span>
-        <span className="block text-xs text-gray-500 truncate">
-          {b.service}<span className="text-gray-400"> · {row.technicians.name} · {fmtPrice(b.price)}</span>
-        </span>
-        {hold && <span className={`block text-[11px] mt-0.5 ${hold.urgent ? "text-red-600 font-medium" : "text-amber-600"}`}>{hold.label}</span>}
-      </button>
+      <div className="min-w-0 flex-1 basis-40">
+        <button type="button" onClick={() => actions.onOpen(row)} className="block w-full text-left group">
+          <span className="text-sm font-medium group-hover:underline">{b.clientName}</span>
+          <span className="block text-xs text-gray-500 truncate">
+            {b.service}<span className="text-gray-400"> · {row.technicians.name} · {fmtPrice(b.price)}</span>
+          </span>
+          {hold && <span className={`block text-[11px] mt-0.5 ${hold.urgent ? "text-red-600 font-medium" : "text-amber-600"}`}>{hold.label}</span>}
+        </button>
+        <ReminderStamp row={row} onSent={actions.onReminded} className="block mt-0.5" />
+      </div>
       <div className="flex flex-wrap items-center gap-2 basis-full sm:basis-auto sm:shrink-0">
         <Badge status={b.status} />
-        <RemindButton row={row} techName={row.technicians.name} onSent={actions.onReminded} />
+        <RemindButton row={row} techName={row.technicians.name} onSent={actions.onReminded} stamp={false} />
         {b.status === "pending_deposit" && (
           <div className={quickGroup}>
-            <button type="button" disabled={busy} onClick={() => actions.onStatus(b.id, "confirmed")} className={`${quickBtn} bg-black text-white border-black hover:bg-gray-800`}>Deposit received</button>
+            <button type="button" disabled={busy} onClick={() => actions.onStatus(b.id, "confirmed")} className={`${quickBtn} bg-black text-white border-black hover:bg-gray-800`}>{busy ? "Saving…" : "Deposit received"}</button>
             <button type="button" disabled={busy} onClick={() => { if (window.confirm(`Cancel ${b.clientName}'s booking?`)) actions.onStatus(b.id, "cancelled"); }} className={`${quickBtn} border-gray-200 text-gray-500 hover:border-red-300 hover:text-red-600`}>Cancel</button>
           </div>
         )}

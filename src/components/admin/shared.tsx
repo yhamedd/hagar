@@ -128,32 +128,48 @@ export const REMINDABLE_STATUSES = ["pending_deposit", "confirmed"];
  * already written -- the admin just presses send. Clicking also records the
  * reminder so everyone on the dashboard can see it has been done.
  */
-export function RemindButton({ row, techName, onSent }: { row: BookingRow; techName: string; onSent: (id: number, sent?: boolean) => void }) {
+/** "Reminded Nov 18, 7:16 AM · Undo" -- shown once a reminder has been recorded. */
+export function ReminderStamp({ row, onSent, className = "" }: { row: BookingRow; onSent: (id: number, sent?: boolean) => void; className?: string }) {
+  const b = row.bookings;
+  if (!b.reminderSentAt) return null;
+  return (
+    <span className={`text-[10px] text-gray-400 whitespace-nowrap ${className}`}>
+      Reminded {format(new Date(b.reminderSentAt), "MMM d, h:mm a")}
+      {" · "}
+      <button type="button" onClick={() => onSent(b.id, false)} title="Mark as not reminded" className="underline hover:text-black">Undo</button>
+    </span>
+  );
+}
+
+/**
+ * WhatsApp reminder button. By default the "Reminded" stamp sits under it;
+ * pass `stamp={false}` where the row must keep one height and render
+ * <ReminderStamp> elsewhere.
+ */
+export function RemindButton({ row, techName, onSent, stamp = true }: { row: BookingRow; techName: string; onSent: (id: number, sent?: boolean) => void; stamp?: boolean }) {
   const b = row.bookings;
   if (!REMINDABLE_STATUSES.includes(b.status) || b.bookingDate < format(new Date(), "yyyy-MM-dd")) return null;
   const href = reminderLink(b, techName);
   if (!href) return <span className="text-[10px] text-gray-400" title="This phone number can't be used on WhatsApp">No WhatsApp no.</span>;
-  const sent = b.reminderSentAt ? new Date(b.reminderSentAt) : null;
+  const sent = Boolean(b.reminderSentAt);
+  const link = (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      onClick={() => onSent(b.id)}
+      title={`Send ${b.clientName} a WhatsApp reminder`}
+      className={`inline-flex items-center justify-center gap-1.5 h-7 px-2.5 text-[11px] font-medium whitespace-nowrap border transition-colors ${sent ? "border-[#25D366] text-[#128C4B] hover:bg-green-50" : "border-[#25D366] bg-[#25D366] text-white hover:bg-[#1ebe5d]"}`}
+    >
+      <WhatsAppIcon className="w-3.5 h-3.5" />
+      {sent ? "Remind again" : "Remind"}
+    </a>
+  );
+  if (!stamp) return link;
   return (
     <span className="inline-flex flex-col items-start gap-0.5">
-      <a
-        href={href}
-        target="_blank"
-        rel="noopener noreferrer"
-        onClick={() => onSent(b.id)}
-        title={`Send ${b.clientName} a WhatsApp reminder`}
-        className={`inline-flex items-center gap-1.5 h-7 px-2.5 text-[11px] font-medium whitespace-nowrap transition-colors ${sent ? "border border-[#25D366] text-[#128C4B] hover:bg-green-50" : "bg-[#25D366] text-white hover:bg-[#1ebe5d]"}`}
-      >
-        <WhatsAppIcon className="w-3.5 h-3.5" />
-        {sent ? "Remind again" : "Remind"}
-      </a>
-      {sent && (
-        <span className="text-[10px] text-gray-400 whitespace-nowrap">
-          Reminded {format(sent, "MMM d, h:mm a")}
-          {" · "}
-          <button type="button" onClick={() => onSent(b.id, false)} title="Mark as not reminded" className="underline hover:text-black">Undo</button>
-        </span>
-      )}
+      {link}
+      <ReminderStamp row={row} onSent={onSent} />
     </span>
   );
 }

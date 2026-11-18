@@ -322,16 +322,25 @@ export default function AdminPage() {
     if (await mutate("/api/admin/bookings/reminder", json("POST", { id, sent }), sent ? "WhatsApp opened, but the reminder could not be recorded" : "Could not mark the booking as not reminded") && tab === "overview") loadStats();
   };
 
+  // The change shows on screen at once; the server call and the reload that
+  // follows happen behind it, so a slow connection never leaves a dead button.
   const changeStatus = async (id: number, status: string) => {
     setUpdatingId(id);
     setActionMessage(null);
+    const patch = (rows: BookingRow[]) => rows.map((r) => (r.bookings.id === id ? { ...r, bookings: { ...r.bookings, status } } : r));
+    setBookings(patch);
+    setCalItems(patch);
+    setStats((prev) => prev && { ...prev, lists: { today: patch(prev.lists.today), tomorrow: patch(prev.lists.tomorrow), pending: patch(prev.lists.pending).filter((r) => r.bookings.status === "pending_deposit") } });
     try {
       const r = await af("/api/admin/bookings", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, status }) });
       const d = await r.json().catch(() => ({}));
-      if (!r.ok) { setActionMessage({ text: d.error || "Could not update booking", error: true }); return; }
-      setActionMessage({ text: "Booking status updated", error: false });
-      await refresh();
-    } finally { setUpdatingId(null); }
+      setActionMessage(r.ok ? { text: "Booking status updated", error: false } : { text: d.error || "Could not update booking", error: true });
+    } catch {
+      setActionMessage({ text: "Could not update booking. Check your connection and try again.", error: true });
+    } finally {
+      setUpdatingId(null);
+      refresh(); // picks up the saved state, or puts the old one back after a failure
+    }
   };
 
   const moveCal = (dir: -1 | 1) =>
